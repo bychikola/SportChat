@@ -1,0 +1,17 @@
+{
+  "name": "sportchat",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SportChat — sports analysis chat powered by the real Claude Code CLI (Agent SDK)",
+  "type": "module",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.1.0",
+    "express": "^4.21.2",
+    "ws": "^8.18.0"
+  }
+}

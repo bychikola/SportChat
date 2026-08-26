@@ -1,0 +1,20 @@
+# зависимости
+node_modules/
+
+# рантайм-данные SportChat
+data/
+server.log
+*.log
+
+# пользовательские артефакты workspace
+workspace/notes/
+workspace/.claude/settings.local.json
+
+# окружение
+.env
+.env.*
+
+# служебное
+.claude/
+.DS_Store
+Thumbs.db
