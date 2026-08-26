@@ -61,10 +61,16 @@ if [[ "$MODE" == "host" ]]; then
   UP="127.0.0.1:${PORT}"
   curl -fs "http://127.0.0.1:${PORT}/api/meta" >/dev/null 2>&1 || die "SportChat не отвечает на 127.0.0.1:${PORT} — запусти docker compose up -d"
 else
-  # из контейнера caddy до хоста: шлюз docker0 (или host.docker.internal)
-  GW="$(ip -4 addr show docker0 2>/dev/null | grep -oP 'inet \K[\d.]+' | head -1 || true)"
-  UP="${GW:-host.docker.internal}:${PORT}"
-  warn "Caddy в Docker: проксирую на $UP (шлюз docker0). Если не заработает — поправь в Caddyfile вручную"
+  # caddy в контейнере: соединяем оба контейнера общей docker-сетью —
+  # тогда апстрим по имени sportchat:3777, и SportChat остаётся на 127.0.0.1
+  # (не открываем его наружу, как при 172.17.0.1/0.0.0.0)
+  NET="sportchat-net"
+  docker network create "$NET" 2>/dev/null || true
+  docker network connect "$NET" "$CTN" 2>/dev/null || true
+  docker network connect "$NET" sportchat 2>/dev/null || true
+  docker exec "$CTN" getent hosts sportchat >/dev/null 2>&1 || die "Не удалось соединить caddy и sportchat сетью $NET"
+  UP="sportchat:${PORT}"
+  info "Caddy в Docker: общая сеть $NET, апстрим $UP"
 fi
 
 # ── Caddyfile: бэкап + добавление сайта (идемпотентно) ──
@@ -94,7 +100,8 @@ if [[ "$MODE" == "host" ]]; then
   systemctl reload caddy
   info "Caddy перезагружен (systemd)"
 else
-  docker cp "$CFG" "$CTN:/etc/caddy/Caddyfile"
+  # Caddyfile примонтирован bind-mount'ом — контейнер уже видит нашу правку;
+  # docker cp сюда класть НЕЛЬЗЯ (device or resource busy), только reload
   docker exec "$CTN" caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null
   docker exec "$CTN" caddy reload --config /etc/caddy/Caddyfile
   info "Caddy перезагружен (контейнер $CTN)"
