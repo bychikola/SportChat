@@ -1,0 +1,39 @@
+services:
+  sportchat:
+    build: .
+    image: sportchat:latest
+    container_name: sportchat
+    restart: unless-stopped
+    ports:
+      - "${BIND_IP:-127.0.0.1}:${PORT:-3777}:3777"
+    env_file:
+      - .env
+    environment:
+      HOST: 0.0.0.0
+    volumes:
+      - ./workspace:/app/workspace          # конфиг агента (CLAUDE.md, skills, .mcp.json)
+      - ./data:/app/data                    # история разборов SportChat
+      - claude_home:/home/sportchat/.claude # сессии Claude Code, плагины, транскрипты
+
+  # Автоматический HTTPS для домена: docker compose --profile proxy up -d
+  caddy:
+    image: caddy:2-alpine
+    container_name: sportchat-caddy
+    profiles: ["proxy"]
+    restart: unless-stopped
+    depends_on:
+      - sportchat
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:-}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  claude_home:
+  caddy_data:
+  caddy_config:

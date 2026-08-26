@@ -7,7 +7,8 @@ import { ChatConnection } from './agent.js';
 import apiRouter from './routes.js';
 
 const PORT = Number(process.env.SPORTCHAT_PORT || 3777);
-const HOST = '127.0.0.1';
+// в Docker контейнер обязан слушать 0.0.0.0; локально по умолчанию — только localhost
+const HOST = process.env.HOST || '127.0.0.1';
 
 ensureWorkspace();
 
@@ -41,9 +42,10 @@ wss.on('connection', (ws) => {
 });
 
 server.listen(PORT, HOST, () => {
+  const shown = HOST === '0.0.0.0' ? '127.0.0.1' : HOST;
   console.log('');
   console.log('  ⚡ SportChat — аналитика на реальном Claude Code');
-  console.log(`  ▸ Интерфейс:  http://${HOST}:${PORT}`);
+  console.log(`  ▸ Интерфейс:  http://${shown}:${PORT}`);
   console.log(`  ▸ Workspace:  ${path.join(ROOT, 'workspace')}`);
   console.log('');
 });

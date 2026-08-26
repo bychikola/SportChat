@@ -1,0 +1,15 @@
+node_modules
+data
+.git
+.gitignore
+server.log
+*.log
+.env
+.env.*
+workspace/notes
+workspace/.claude/settings.local.json
+.claude
+deploy
+Dockerfile
+docker-compose.yml
+.dockerignore

@@ -14,6 +14,35 @@ npm start          # → http://127.0.0.1:3777
 Требуется Node 18+ и установленный/авторизованный Claude Code
 (`claude` в PATH; токен и BASE_URL берутся из окружения или `~/.claude/settings.json`).
 
+## 🚀 Деплой на VPS (Docker, одна команда)
+
+Свежие Ubuntu/Debian, root:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/bychikola/SportChat/main/install.sh -o install.sh
+sudo bash install.sh            # спросит ключ OpenRouter и (опционально) домен
+```
+
+Установщик сам поставит Docker, склонирует репозиторий в `/opt/sportchat`,
+создаст `.env`, соберёт образ, запустит контейнер и дождётся готовности.
+Неинтерактивно: `sudo bash install.sh --token sk-or-v1-… --domain chat.example.com`
+
+**Что внутри:**
+- контейнер `node:22-slim` + git, приложение слушает `0.0.0.0:3777`;
+- авторизация модели — через env (`ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` из `.env`),
+  маршрутизация моделей — в `workspace/.claude/settings.json`;
+- персистентность: `./workspace` (конфиг агента), `./data` (история разборов),
+  том `claude_home` (сессии Claude Code, плагины — переживают пересоздание контейнера);
+- опциональный **Caddy** с автоматическим Let's Encrypt HTTPS:
+  `sudo bash install.sh --domain chat.example.com` (нужна A-запись домена на сервер).
+
+**Обновление до последней версии:** `sudo bash update.sh`
+**Логи:** `docker compose logs -f` · **Рестарт:** `docker compose restart`
+
+> Безопасность: без домена порт привязывается к `127.0.0.1` — доступ снаружи
+> только через SSH-туннель (`ssh -L 3777:127.0.0.1:3777 user@server`).
+> Ключ хранится в `.env` с правами 600 и не попадает в git.
+
 ## Что внутри
 
 | Панель | Что делает |

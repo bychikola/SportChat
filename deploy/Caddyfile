@@ -1,0 +1,13 @@
+# Автоматический HTTPS от Let's Encrypt.
+# DOMAIN подставляется из .env (environment в docker-compose).
+{$DOMAIN} {
+	encode gzip
+
+	# долгие ответы агента — без таймаутов прокси
+	reverse_proxy sportchat:3777 {
+		flush_interval -1
+		transport http {
+			response_header_timeout 0s
+		}
+	}
+}
