@@ -221,6 +221,9 @@ export class ChatConnection {
               this.send({ t: 'tool_final', id: block.id, name: block.name, input: block.input ?? {} });
             }
           }
+          // ВАЖНО: полное сообщение тоже уходит клиенту — по нему клиент
+          // делает финальный markdown-рендер (reconcileFinal)
+          this.send({ t: 'assistant', message: m.message });
           break;
 
         case 'user': {

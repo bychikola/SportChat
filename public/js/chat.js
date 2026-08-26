@@ -100,28 +100,29 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
     const c = ensureAssistant();
     const seg = document.createElement('div');
     seg.className = 'md';
+    const caret = document.createElement('span');
+    caret.className = 'stream-caret';
+    seg.appendChild(caret);
     c.bubble.appendChild(seg);
-    const entry = { kind: 'text', seg, buf: '' };
+    const entry = { kind: 'text', seg, caret, buf: '' };
     pendingSegs.push(entry);
     if (index != null) c.segs.set(index, entry);
     return entry;
   }
 
-  function renderText(entry, throttled = true) {
-    const paint = () => {
-      entry.seg.innerHTML = `${mdToHtml(entry.buf)}<span class="stream-caret"></span>`;
-      scrollDown();
-    };
-    if (throttled) {
-      if (!renderText._raf) {
-        renderText._raf = requestAnimationFrame(() => {
-          renderText._raf = null;
-          paint();
-        });
-      }
-    } else {
-      paint();
-    }
+  /**
+   * Стрим-превью: один текстовый узел на дельту (O(1) на дельту).
+   * НЕ перерисовываем markdown на каждом куске — при длинных ответах
+   * это O(n²) и главный поток встаёт: страница «живая» (CSS-анимации),
+   * но кнопки не нажимаются. Полный markdown рендерится один раз в финале.
+   */
+  const STREAM_PREVIEW_LIMIT = 40_000;
+
+  function appendStreamText(entry, chunk) {
+    entry.buf += chunk;
+    if (entry.buf.length > STREAM_PREVIEW_LIMIT) return; // превью урезано, финал всё перерисует
+    entry.seg.insertBefore(document.createTextNode(chunk), entry.caret);
+    scrollDown();
   }
 
   /* ── мышление ── */
@@ -240,22 +241,28 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
 
   /* ── финализация assistant-сообщения ── */
   function reconcileFinal(content) {
-    // сверяем накопленные стрим-сегменты с финальными блоками
-    content.forEach((block, idx) => {
-      const entry = pendingSegs[idx];
-      if (!entry) return;
-      if (block.type === 'text' && entry.kind === 'text') {
-        entry.buf = block.text;
-        renderText(entry, false);
-        entry.seg.querySelector('.stream-caret')?.remove();
-      } else if (block.type === 'tool_use' && entry.kind === 'tool') {
-        const t = cur?.tools.get(block.id);
-        if (t) {
+    // Порядок финальных блоков может отличаться от стрима (thinking часто
+    // отсутствует в финальном content) — сопоставляем ПО ТИПУ, а не по индексу.
+    const textBlocks = content.filter((b) => b.type === 'text');
+    const toolBlocks = content.filter((b) => b.type === 'tool_use');
+    let ti = 0;
+    for (const entry of pendingSegs) {
+      if (entry.kind === 'text') {
+        const block = textBlocks[ti++];
+        if (block) {
+          entry.buf = block.text;
+          // единственный полный markdown-рендер — на финальном тексте
+          entry.seg.innerHTML = mdToHtml(block.text);
+        }
+      } else if (entry.kind === 'tool') {
+        const block = toolBlocks.find((b) => b.id === entry.id);
+        const t = cur?.tools.get(entry.id);
+        if (block && t) {
           t.inputObj = block.input ?? {};
           showToolInput(t, JSON.stringify(t.inputObj, null, 2));
         }
       }
-    });
+    }
     pendingSegs = [];
     cur?.bubble.querySelectorAll('.stream-caret').forEach((e) => e.remove());
     scrollDown();
@@ -321,8 +328,7 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
           // дельта без контекста — продолжаем последний текстовый сегмент
           entry = [...pendingSegs].reverse().find((s) => s.kind === 'text') || pushTextSegment(msg.index);
         }
-        entry.buf += msg.v;
-        renderText(entry);
+        appendStreamText(entry, msg.v);
         break;
       }
       case 'thinking_delta': {
