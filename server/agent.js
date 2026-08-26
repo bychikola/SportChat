@@ -131,7 +131,8 @@ export class ChatConnection {
       if (sessionId) options.resume = sessionId;
 
       const turnStart = Date.now();
-      console.log(`[turn] старт: "${text.slice(0, 60)}" session=${sessionId || 'новый'} mode=${options.permissionMode}`);
+      // текст сообщения в логи НЕ пишем — это PII пользователя, только длину
+      console.log(`[turn] старт: длина=${text.length} session=${sessionId || 'новый'} mode=${options.permissionMode}`);
 
       const first = await this.consume(text, options, false);
 
@@ -161,7 +162,7 @@ export class ChatConnection {
         console.log('[turn] прерван пользователем');
         this.send({ t: 'done', stopped: true });
       } else {
-        console.error('[turn] ОШИБКА:', err?.message?.slice(0, 300));
+        console.error('[turn] ОШИБКА:', sanitizeLog(err?.message?.slice(0, 300)));
         this.send({ t: 'error', message: cleanError(err) });
         this.send({ t: 'done', stopped: false, failed: true });
       }
@@ -349,6 +350,15 @@ function summarizeContent(content) {
   text = text.trim();
   if (text.length > 4000) text = `${text.slice(0, 4000)}\n… (обрезано)`;
   return text || '(пусто)';
+}
+
+/** Маскируем ключи/токены/query-строки, прежде чем писать в логи. */
+function sanitizeLog(s) {
+  return String(s ?? '')
+    .replace(/sk-or-v1-[A-Za-z0-9]+/g, 'sk-or-v1-***')
+    .replace(/sk-[A-Za-z0-9]{8,}/g, 'sk-***')
+    .replace(/(Bearer\s+)[A-Za-z0-9._-]+/gi, '$1***')
+    .replace(/[?&][^\s"'<>]+/g, '?***');
 }
 
 function cleanError(err) {

@@ -16,13 +16,14 @@ const app = express();
 app.disable('x-powered-by');
 app.use(express.json({ limit: '2mb' }));
 
-// лог каждого HTTP-запроса — чтобы docker logs показывал активность
+// лог каждого HTTP-запроса — чтобы docker logs показывал активность;
+// только путь без query-строки (там могут быть токены)
 app.use((req, res, next) => {
   const t0 = Date.now();
   res.on('finish', () => {
     const ms = Date.now() - t0;
-    console.log(`${new Date().toISOString()} ${req.method} ${req.originalUrl} → ${res.statusCode} (${ms}ms)`);
-    if (res.statusCode >= 500) console.error(`[http-5xx] ${req.method} ${req.originalUrl} ${res.statusCode}`);
+    console.log(`${new Date().toISOString()} ${req.method} ${req.path} → ${res.statusCode} (${ms}ms)`);
+    if (res.statusCode >= 500) console.error(`[http-5xx] ${req.method} ${req.path} ${res.statusCode}`);
   });
   next();
 });
