@@ -15,6 +15,18 @@ ensureWorkspace();
 const app = express();
 app.disable('x-powered-by');
 app.use(express.json({ limit: '2mb' }));
+
+// лог каждого HTTP-запроса — чтобы docker logs показывал активность
+app.use((req, res, next) => {
+  const t0 = Date.now();
+  res.on('finish', () => {
+    const ms = Date.now() - t0;
+    console.log(`${new Date().toISOString()} ${req.method} ${req.originalUrl} → ${res.statusCode} (${ms}ms)`);
+    if (res.statusCode >= 500) console.error(`[http-5xx] ${req.method} ${req.originalUrl} ${res.statusCode}`);
+  });
+  next();
+});
+
 app.use(express.static(path.join(ROOT, 'public')));
 app.use('/api', apiRouter);
 
@@ -27,6 +39,7 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
 
 wss.on('connection', (ws) => {
+  console.log(`[ws] соединение открыто (всего: ${wss.clients.size})`);
   const conn = new ChatConnection(ws);
   ws.on('message', (raw) => {
     let msg;
@@ -37,8 +50,11 @@ wss.on('connection', (ws) => {
     }
     if (msg && typeof msg === 'object') conn.handleMessage(msg);
   });
-  ws.on('close', () => conn.close());
-  ws.on('error', () => conn.close());
+  ws.on('close', () => {
+    console.log(`[ws] соединение закрыто (осталось: ${wss.clients.size - 1})`);
+    conn.close();
+  });
+  ws.on('error', (e) => console.error('[ws] ошибка:', e.message));
 });
 
 server.listen(PORT, HOST, () => {

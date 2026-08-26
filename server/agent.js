@@ -130,6 +130,9 @@ export class ChatConnection {
       }
       if (sessionId) options.resume = sessionId;
 
+      const turnStart = Date.now();
+      console.log(`[turn] старт: "${text.slice(0, 60)}" session=${sessionId || 'новый'} mode=${options.permissionMode}`);
+
       const first = await this.consume(text, options, false);
 
       // Некоторые шлюзы (OpenRouter) иногда завершают ход ПУСТЫМ финальным
@@ -139,6 +142,7 @@ export class ChatConnection {
         && !this.abort.signal.aborted;
 
       if (needNudge && this.sessionId) {
+        console.log('[turn] пустой финал после инструментов — догенерация');
         this.send({ t: 'nudge' });
         await this.consume(NUDGE_PROMPT, { ...options, resume: this.sessionId }, true);
       }
@@ -146,14 +150,18 @@ export class ChatConnection {
       if (this.sessionId) {
         saveSession(this.sessionId, text.slice(0, 80), model && model !== 'default' ? model : null);
       }
+      const secs = ((Date.now() - turnStart) / 1000).toFixed(1);
+      console.log(`[turn] завершён за ${secs}с, текст=${first.sawText ? 'да' : 'НЕТ'}, инструменты=${first.usedTools ? 'да' : 'нет'}, subtype=${first.result?.subtype || '?'}`);
       this.send({ t: 'done', stopped: false });
     } catch (err) {
       const aborted = this.abort?.signal.aborted ||
         /abort/i.test(String(err?.name)) || /abort/i.test(String(err?.message));
       if (aborted) {
         if (this.sessionId) saveSession(this.sessionId, text.slice(0, 80), null);
+        console.log('[turn] прерван пользователем');
         this.send({ t: 'done', stopped: true });
       } else {
+        console.error('[turn] ОШИБКА:', err?.message?.slice(0, 300));
         this.send({ t: 'error', message: cleanError(err) });
         this.send({ t: 'done', stopped: false, failed: true });
       }
