@@ -4,7 +4,7 @@ import { $, esc, openModal, button } from './util.js';
 import { api } from './api.js';
 
 export function createSettings({ S, updateTablo, updateEngineInfo }) {
-  const MODEL_LABELS = { sonnet: 'ox-alpha (sonnet)', default: 'как в аккаунте', opus: 'opus 4.8', haiku: 'haiku 4.5' };
+  const MODEL_LABELS = { default: 'модель окружения' };
   const modelLabel = () => MODEL_LABELS[S.model] || S.model;
 
   async function openSettings() {

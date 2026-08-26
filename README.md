@@ -86,8 +86,8 @@ MCP-серверы).
 
 Клик по модели на табло → выбор источника и модели:
 
-- **Конфиг workspace** — как задано в `~/.claude` / `workspace/.claude/settings.json`
-  (по умолчанию ox-alpha через OpenRouter);
+- **Конфиг workspace** — как задано в окружении твоего Claude Code
+  (по умолчанию `deepseek-v4-flash` через шлюз DeepSeek);
 - **OpenRouter** — вставь ключ, получи живой список всех моделей (сотни, с поиском
   и фильтром `:free`);
 - **DeepSeek** — официальный Anthropic-совместимый эндпоинт
@@ -121,9 +121,9 @@ workspace/
 (TL;DR → таблицы → факторы → вероятности → итог) и жёсткие ограничения
 (никаких «верняков», разделение фактов и оценок, риски ставок).
 
-Модели маршрутизируются через OpenRouter: алиас `sonnet` → `stealth/ox-alpha[1M]`
-(см. `env` в `workspace/.claude/settings.json`). Токен не хранится в проекте —
-наследуется из `~/.claude/settings.json`.
+Модель и шлюз наследуются из окружения Claude Code (или выбираются в меню
+источников: OpenRouter / DeepSeek / свой JSON). По умолчанию — `deepseek-v4-flash`
+через DeepSeek-шлюз. Токен не хранится в проекте — наследуется из `~/.claude/settings.json`.
 
 ## Архитектура
 

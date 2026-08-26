@@ -1,12 +1,5 @@
 {
-  "model": "sonnet",
-  "env": {
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "stealth/ox-alpha[1M]",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL_NAME": "stealth/ox-alpha",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": "anthropic/claude-opus-4.8",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "anthropic/claude-haiku-4.5",
-    "ANTHROPIC_MODEL": "stealth/ox-alpha[1M]"
-  },
+  "enableAllProjectMcpServers": true,
   "permissions": {
     "allow": [
       "Read",
@@ -20,6 +13,5 @@
       "ReadMcpResourceTool"
     ],
     "deny": []
-  },
-  "enableAllProjectMcpServers": true
+  }
 }

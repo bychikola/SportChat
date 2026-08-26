@@ -11,7 +11,7 @@ const S = {
   ws: null,
   sessionId: null,
   busy: false,
-  model: localStorage.getItem('sc_model') || 'sonnet',
+  model: localStorage.getItem('sc_model') || 'deepseek-v4-flash',
   permMode: localStorage.getItem('sc_permMode') || 'default',
   includeUser: localStorage.getItem('sc_includeUser') === '1',
   cost: 0,
@@ -86,7 +86,12 @@ const wsApi = connectWs({
       return;
     }
     if (msg.t === 'done') loadSessions();
-    chat.handle(msg);
+    try {
+      chat.handle(msg);
+    } catch (e) {
+      console.error('[ws-handle]', msg.t, e);
+      rail.cliLog(`[client] ошибка обработки ${msg.t}: ${e.message}`, 'err');
+    }
   },
   onState(connected) {
     const el = $('#sbConn');
@@ -94,6 +99,7 @@ const wsApi = connectWs({
       ? '<span class="sb-led sb-led-ok"></span> подключено'
       : '<span class="sb-led sb-led-off"></span> соединение потеряно';
     if (!connected && S.busy) {
+      chat?.stopTurnTimer?.();
       setStatus('ready', 'ГОТОВ');
     }
   },
@@ -158,10 +164,10 @@ function onSlash(text) {
 
 /* ══════════ табло: выбор источника и модели ══════════ */
 const MODELS = [
-  { v: 'sonnet', label: 'ox-alpha', hint: 'OpenRouter · основной' },
-  { v: 'default', label: 'по умолчанию', hint: 'ANTHROPIC_MODEL' },
-  { v: 'opus', label: 'opus 4.8', hint: 'глубокий анализ' },
-  { v: 'haiku', label: 'haiku 4.5', hint: 'быстрые ответы' },
+  { v: 'deepseek-v4-flash', label: 'deepseek-v4-flash', hint: 'DeepSeek · основной' },
+  { v: 'deepseek-v4-pro', label: 'deepseek-v4-pro', hint: 'глубокий анализ' },
+  { v: 'deepseek-v4-flash-vision-exp', label: 'deepseek-v4-flash-vision', hint: 'визуал' },
+  { v: 'default', label: 'по умолчанию', hint: 'модель окружения' },
 ];
 const modelBtn = $('#modelBtn');
 const modelMenu = $('#modelMenu');
@@ -184,7 +190,7 @@ async function renderModelMenu() {
   const provRows = [
     `<button class="mm-prov ${act.provider === 'config' ? 'active' : ''}" data-p="config">
        <span class="mm-dot mm-dot-ok"></span><span>Конфиг workspace</span>
-       <span class="mm-hint">ox-alpha · env</span>
+       <span class="mm-hint">${esc(data.env?.baseHost || 'env')} · ${esc(data.env?.model || 'env')}</span>
      </button>`,
     ...Object.entries(data.providers).map(([key, p]) => `
       <button class="mm-prov ${act.provider === key ? 'active' : ''}" data-p="${esc(key)}">
@@ -198,7 +204,9 @@ async function renderModelMenu() {
 
   let modelsHtml = '';
   if (act.provider === 'config') {
+    const env = data.env || {};
     modelsHtml = `
+      <div class="mm-hintblock">Шлюз окружения: <b style="color:var(--chalk)">${esc(env.baseHost || '…')}</b>${env.model ? ` · модель: <b style="color:var(--chalk)">${esc(env.model)}</b>` : ''}</div>
       ${MODELS.map((m) => `
         <button data-v="${m.v}" class="${S.model === m.v ? 'active' : ''}">
           <span>${m.label}</span><span class="mm-hint">${m.hint}</span>
@@ -354,7 +362,7 @@ async function selectModel(provider, model) {
   }
 }
 
-/** Подпись на табло: «ox-alpha» для конфига или «модель · источник». */
+/** Подпись на табло: выбранная модель для конфига или «модель · источник». */
 function updateTabloModelLabel() {
   const act = S.providersData?.active || { provider: 'config', model: '' };
   if (act.provider && act.provider !== 'config') {
@@ -586,6 +594,11 @@ $('.brand').addEventListener('click', () => {
       S.activeProvider = S.providersData.active.provider;
     }
   } catch { /* меню подтянет при открытии */ }
+  // миграция: устаревшие выборы (sonnet/ox-alpha/…) больше не существуют
+  if (S.model !== 'default' && !MODELS.some((m) => m.v === S.model)) {
+    S.model = 'deepseek-v4-flash';
+    localStorage.setItem('sc_model', S.model);
+  }
   updateTabloModelLabel();
   updateTablo();
   updateEngineInfo();

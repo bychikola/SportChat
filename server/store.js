@@ -81,18 +81,12 @@ export const DEFAULT_SYSTEM_PROMPT = `# РОЛЬ: главный аналити�
   и самопроверку.`;
 
 export const DEFAULT_SETTINGS = {
-  // Модели OpenRouter: алиас "sonnet" → ox-alpha (как в глобальном конфиге пользователя).
-  // Токен и BASE_URL наследуются из окружения (~/.claude/settings.json) — здесь не дублируются.
-  model: 'sonnet',
+  // Модель и шлюз НАМЕРЕННО не задаются здесь: конфиг-режим наследует текущий
+  // выбор пользователя (ANTHROPIC_MODEL / ANTHROPIC_BASE_URL из окружения).
+  // Иначе проект переопределял бы то, что выбрано в его Claude Code (например,
+  // ox-alpha при DeepSeek-шлюзе → 400 invalid_request_error).
   // MCP-серверы из workspace/.mcp.json подключать без интерактивного одобрения
   enableAllProjectMcpServers: true,
-  env: {
-    ANTHROPIC_DEFAULT_SONNET_MODEL: 'stealth/ox-alpha[1M]',
-    ANTHROPIC_DEFAULT_SONNET_MODEL_NAME: 'stealth/ox-alpha',
-    ANTHROPIC_DEFAULT_OPUS_MODEL: 'anthropic/claude-opus-4.8',
-    ANTHROPIC_DEFAULT_HAIKU_MODEL: 'anthropic/claude-haiku-4.5',
-    ANTHROPIC_MODEL: 'stealth/ox-alpha[1M]',
-  },
   permissions: {
     allow: [
       'Read', 'Glob', 'Grep', 'WebSearch', 'WebFetch', 'TodoWrite',

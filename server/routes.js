@@ -141,7 +141,18 @@ function sanitize(data) {
 }
 
 router.get('/providers', (req, res) => {
-  res.json(sanitize(ensureBuiltins(readProviders())));
+  const payload = sanitize(ensureBuiltins(readProviders()));
+  // что сейчас унаследует конфиг-режим из окружения процесса
+  const base = process.env.ANTHROPIC_BASE_URL || '';
+  let envBase = 'anthropic';
+  try {
+    envBase = new URL(base).host;
+  } catch { /* не парсится — показываем как есть */ }
+  payload.env = {
+    baseHost: envBase,
+    model: process.env.ANTHROPIC_MODEL || '',
+  };
+  res.json(payload);
 });
 
 router.put('/providers/:key', (req, res) => {

@@ -263,13 +263,18 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
 
   function finishRunMeta(m) {
     if (!m || !cur) return;
-    // модель иногда завершает ход после инструментов без текста — честно помечаем
-    const hadText = [...cur.bubble.querySelectorAll('.md')].some((el) => el.textContent.trim());
-    if (cur.tools.size > 0 && !hadText && !m.isError) {
-      const note = document.createElement('div');
-      note.className = 'result-meta';
-      note.innerHTML = '<span>ℹ️ инструменты выполнены — текстового ответа модель не вернула</span>';
-      cur.wrap.appendChild(note);
+    // при догенерации заменяем предыдущую мета-строку, а не копим
+    if (m.nudged) {
+      cur.wrap.querySelectorAll('.result-meta').forEach((el) => el.remove());
+    } else {
+      // модель иногда завершает ход после инструментов без текста — честно помечаем
+      const hadText = [...cur.bubble.querySelectorAll('.md')].some((el) => el.textContent.trim());
+      if (cur.tools.size > 0 && !hadText && !m.isError) {
+        const note = document.createElement('div');
+        note.className = 'result-meta';
+        note.innerHTML = '<span>ℹ️ инструменты выполнены — текстового ответа модель не вернула</span>';
+        cur.wrap.appendChild(note);
+      }
     }
     S.cost += Number(m.costUsd || 0);
     S.turnsTotal = m.numTurns ?? 0;
@@ -364,6 +369,14 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
       case 'permission_request':
         addPermissionCard(msg);
         break;
+      case 'nudge': {
+        const note = document.createElement('div');
+        note.className = 'result-meta';
+        note.innerHTML = '<span>⚠️ модель вернула пустой ответ — запрашиваю продолжение…</span>';
+        cur?.wrap.appendChild(note);
+        setStatus('busy', 'ДОГЕНЕРАЦИЯ');
+        break;
+      }
       case 'usage_out':
         S.liveOutTokens = Math.max(S.liveOutTokens || 0, msg.tokens || 0);
         updateTablo();
@@ -398,6 +411,7 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
 
   function endRun(stopped) {
     S.busy = false;
+    stopTurnTimer();
     $('#sendBtn').disabled = false;
     $('#stopBtn').hidden = true;
     document.querySelectorAll('.stream-caret').forEach((e) => e.remove());
@@ -416,6 +430,30 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
 
   let onSessionStarted = null;
   const bindSessionStarted = (fn) => { onSessionStarted = fn; };
+
+  /* ── живой таймер ответа ── */
+  let timerInt = null;
+  function startTurnTimer() {
+    const el = $('#turnTimer');
+    const t0 = Date.now();
+    clearInterval(timerInt);
+    const paint = () => {
+      const s = Math.floor((Date.now() - t0) / 1000);
+      el.textContent = `· ${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+    };
+    el.hidden = false;
+    paint();
+    timerInt = setInterval(paint, 1000);
+  }
+  function stopTurnTimer() {
+    clearInterval(timerInt);
+    timerInt = null;
+    const el = $('#turnTimer');
+    if (el) {
+      el.hidden = true;
+      el.textContent = '';
+    }
+  }
 
   /* ── слэш-команды ── */
   function send(rawText) {
@@ -437,6 +475,7 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
     S.busy = true;
     $('#sendBtn').disabled = true;
     $('#stopBtn').hidden = false;
+    startTurnTimer();
     setStatus('busy', 'ДУМАЕТ');
     ws.send({
       t: 'chat',
@@ -556,6 +595,7 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
     },
     hideEmpty: () => emptyState.classList.add('hidden'),
     isBusy: () => S.busy,
+    stopTurnTimer,
     scrollDown,
   };
 }

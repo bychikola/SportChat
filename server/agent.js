@@ -3,6 +3,10 @@ import { WORKSPACE, readMcp, saveSession, resolvePluginPaths, readSystemPrompt, 
 
 const PERM_TIMEOUT_MS = 180_000;
 
+/** Запрос-догонялка: шлюз вернул пустой финал после инструментов. */
+const NUDGE_PROMPT = 'Продолжи. Дай финальный текстовый ответ на последний вопрос пользователя, следуя своему формату вывода (резюме → таблицы → разбор → итог с уверенностью). Не вызывай инструменты без необходимости.';
+
+
 /** Tools that never require a permission prompt on top of settings-file rules. */
 const SILENT_SAFE = new Set([
   'Read', 'Glob', 'Grep', 'WebSearch', 'TodoWrite',
@@ -20,6 +24,7 @@ export class ChatConnection {
   }
 
   send(obj) {
+    if (process.env.SPORTCHAT_DEBUG) console.log('[ws-out]', obj.t, obj.kind || obj.subtype || '');
     if (this.ws.readyState === 1) this.ws.send(JSON.stringify(obj));
   }
 
@@ -116,96 +121,32 @@ export class ChatConnection {
           this.send({ t: 'stderr', v: `Источник «${active.provider}» не настроен (нет ключа) — используется конфиг workspace` });
         }
       } else if (model && model !== 'default') {
-        options.model = model;
+        // Алиасы (sonnet/opus/haiku) резолвит сам CLI через env-маппинги пользователя —
+        // не навязываем их, иначе конфликт с текущим шлюзом (DeepSeek/OpenRouter/…).
+        // Явные полные id (с «/» или deepseek-*) передаём как есть.
+        if (model.includes('/') || /^deepseek-/i.test(model)) {
+          options.model = model;
+        }
       }
       if (sessionId) options.resume = sessionId;
 
-      const q = query({ prompt: text, options });
-      let sawResult = null;
+      const first = await this.consume(text, options, false);
 
-      for await (const m of q) {
-        if (process.env.SPORTCHAT_DEBUG) console.log('[agent-msg]', m.type, m.subtype || '', m.error || '');
-        switch (m.type) {
-          case 'system':
-            if (m.subtype === 'init') {
-              this.sessionId = m.session_id;
-              this.send({
-                t: 'init',
-                sessionId: m.session_id,
-                version: m.claude_code_version,
-                model: m.model,
-                tools: m.tools || [],
-                mcpServers: m.mcp_servers || [],
-                skills: m.skills || [],
-                slashCommands: m.slash_commands || [],
-                plugins: m.plugins || [],
-                permissionMode: m.permissionMode,
-              });
-            }
-            break;
+      // Некоторые шлюзы (OpenRouter) иногда завершают ход ПУСТЫМ финальным
+      // сообщением после инструментов. Просим модель продолжить — один раз.
+      const needNudge = first.result?.subtype === 'success'
+        && !first.sawText && first.usedTools
+        && !this.abort.signal.aborted;
 
-          case 'stream_event':
-            this.handleStreamEvent(m);
-            break;
-
-          case 'assistant':
-            if (m.error) {
-              this.send({ t: 'error', message: `Ошибка агента: ${m.error}` });
-              break;
-            }
-            for (const block of m.message?.content || []) {
-              if (block.type === 'text') {
-                this.send({ t: 'text_final', v: block.text });
-              } else if (block.type === 'thinking') {
-                this.send({ t: 'thinking_final' });
-              } else if (block.type === 'tool_use') {
-                this.send({ t: 'tool_final', id: block.id, name: block.name, input: block.input ?? {} });
-              }
-            }
-            break;
-
-          case 'user': {
-            const content = Array.isArray(m.message?.content) ? m.message.content : [];
-            for (const block of content) {
-              if (block.type === 'tool_result') {
-                this.send({
-                  t: 'tool_result',
-                  id: block.tool_use_id,
-                  isError: !!block.is_error,
-                  preview: summarizeContent(block.content),
-                });
-              }
-            }
-            break;
-          }
-
-          case 'tool_progress':
-            this.send({ t: 'tool_progress', id: m.tool_use_id, elapsed: m.elapsed_time_seconds });
-            break;
-
-          case 'result':
-            sawResult = m;
-            this.send({
-              t: 'result',
-              subtype: m.subtype,
-              isError: !!m.is_error,
-              durationMs: m.duration_ms,
-              numTurns: m.num_turns,
-              costUsd: m.total_cost_usd ?? null,
-              usage: m.usage ? { input: m.usage.input_tokens, output: m.usage.output_tokens } : null,
-              errors: m.errors || [],
-            });
-            break;
-
-          default:
-            break;
-        }
+      if (needNudge && this.sessionId) {
+        this.send({ t: 'nudge' });
+        await this.consume(NUDGE_PROMPT, { ...options, resume: this.sessionId }, true);
       }
 
       if (this.sessionId) {
         saveSession(this.sessionId, text.slice(0, 80), model && model !== 'default' ? model : null);
       }
-      this.send({ t: 'done', stopped: false, subtype: sawResult?.subtype || null });
+      this.send({ t: 'done', stopped: false });
     } catch (err) {
       const aborted = this.abort?.signal.aborted ||
         /abort/i.test(String(err?.name)) || /abort/i.test(String(err?.message));
@@ -220,6 +161,98 @@ export class ChatConnection {
       this.busy = false;
       this.abort = null;
     }
+  }
+
+  /**
+   * Прогоняет один query() и пересылает все события в браузер.
+   * Возвращает {sawText, usedTools, result} — для детекта пустого ответа.
+   */
+  async consume(promptText, options, nudged) {
+    const state = { sawText: false, usedTools: false, result: null };
+    const q = query({ prompt: promptText, options });
+
+    for await (const m of q) {
+      if (process.env.SPORTCHAT_DEBUG) console.log('[agent-msg]', m.type, m.subtype || '', m.error || '');
+      switch (m.type) {
+        case 'system':
+          if (m.subtype === 'init') {
+            this.sessionId = m.session_id;
+            this.send({
+              t: 'init',
+              sessionId: m.session_id,
+              version: m.claude_code_version,
+              model: m.model,
+              tools: m.tools || [],
+              mcpServers: m.mcp_servers || [],
+              skills: m.skills || [],
+              slashCommands: m.slash_commands || [],
+              plugins: m.plugins || [],
+              permissionMode: m.permissionMode,
+            });
+          }
+          break;
+
+        case 'stream_event':
+          if (this.handleStreamEvent(m) === 'text') state.sawText = true;
+          break;
+
+        case 'assistant':
+          if (m.error) {
+            this.send({ t: 'error', message: `Ошибка агента: ${m.error}` });
+            break;
+          }
+          for (const block of m.message?.content || []) {
+            if (block.type === 'text') {
+              if (block.text?.trim()) state.sawText = true;
+              this.send({ t: 'text_final', v: block.text });
+            } else if (block.type === 'thinking') {
+              this.send({ t: 'thinking_final' });
+            } else if (block.type === 'tool_use') {
+              state.usedTools = true;
+              this.send({ t: 'tool_final', id: block.id, name: block.name, input: block.input ?? {} });
+            }
+          }
+          break;
+
+        case 'user': {
+          const content = Array.isArray(m.message?.content) ? m.message.content : [];
+          for (const block of content) {
+            if (block.type === 'tool_result') {
+              this.send({
+                t: 'tool_result',
+                id: block.tool_use_id,
+                isError: !!block.is_error,
+                preview: summarizeContent(block.content),
+              });
+            }
+          }
+          break;
+        }
+
+        case 'tool_progress':
+          this.send({ t: 'tool_progress', id: m.tool_use_id, elapsed: m.elapsed_time_seconds });
+          break;
+
+        case 'result':
+          state.result = m;
+          this.send({
+            t: 'result',
+            subtype: m.subtype,
+            isError: !!m.is_error,
+            durationMs: m.duration_ms,
+            numTurns: m.num_turns,
+            costUsd: m.total_cost_usd ?? null,
+            usage: m.usage ? { input: m.usage.input_tokens, output: m.usage.output_tokens } : null,
+            errors: m.errors || [],
+            nudged: !!nudged,
+          });
+          break;
+
+        default:
+          break;
+      }
+    }
+    return state;
   }
 
   handleStreamEvent(m) {
@@ -240,8 +273,11 @@ export class ChatConnection {
       case 'content_block_delta': {
         const d = ev.delta;
         const idx = ev.index;
-        if (d.type === 'text_delta') this.send({ t: 'text_delta', v: d.text, index: idx });
-        else if (d.type === 'thinking_delta') this.send({ t: 'thinking_delta', v: d.thinking, index: idx });
+        if (d.type === 'text_delta') {
+          this.send({ t: 'text_delta', v: d.text, index: idx });
+          return 'text';
+        }
+        if (d.type === 'thinking_delta') this.send({ t: 'thinking_delta', v: d.thinking, index: idx });
         else if (d.type === 'input_json_delta') this.send({ t: 'tool_input_delta', v: d.partial_json, index: idx });
         break;
       }
@@ -314,6 +350,9 @@ function cleanError(err) {
   }
   if (/ECONNREFUSED|fetch failed|network/i.test(raw)) {
     return 'Сетевая ошибка при обращении к API. Проверь подключение к интернету.';
+  }
+  if (/exited with code 1/i.test(raw)) {
+    return 'Claude Code завершился с ошибкой: вероятно, модель не поддерживается текущим шлюзом или исчерпан баланс ключа. Проверь «источник моделей» на табло (например: DeepSeek-шлюз принимает только deepseek-v4-pro / deepseek-v4-flash).';
   }
   return raw.slice(0, 800);
 }
