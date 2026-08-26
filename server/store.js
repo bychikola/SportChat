@@ -330,6 +330,29 @@ export function writeSystemPrompt(text) {
   fs.writeFileSync(SYSTEM_PROMPT_FILE(), String(text), 'utf8');
 }
 
+/* ---------- providers (источники моделей) ---------- */
+
+const PROVIDERS_FILE = path.join(DATA_DIR, 'providers.json');
+
+export function readProviders() {
+  try {
+    const j = JSON.parse(fs.readFileSync(PROVIDERS_FILE, 'utf8'));
+    return {
+      active: j.active && typeof j.active === 'object'
+        ? j.active
+        : { provider: 'config', model: '' },
+      providers: j.providers && typeof j.providers === 'object' ? j.providers : {},
+    };
+  } catch {
+    return { active: { provider: 'config', model: '' }, providers: {} };
+  }
+}
+
+export function writeProviders(data) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.writeFileSync(PROVIDERS_FILE, JSON.stringify(data, null, 2));
+}
+
 /* ---------- plugins ---------- */
 
 const PLUGINS_SELECTION_FILE = path.join(DATA_DIR, 'plugin-selection.json');

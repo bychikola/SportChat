@@ -1,6 +1,6 @@
 /* SportChat · сборка приложения */
 
-import { $, $$, esc, icon, relTime, fmtCost, fmtInt, toast } from './util.js';
+import { $, $$, esc, icon, relTime, fmtCost, fmtInt, toast, openModal } from './util.js';
 import { api, connectWs } from './api.js';
 import { createChat } from './chat.js';
 import { createRail } from './rail.js';
@@ -111,8 +111,9 @@ chat = createChat({
 });
 
 chat.bindSessionStarted((init) => {
-  // реальная модель и версия от CLI
-  $('#modelBtn').textContent = shortModel(init.model);
+  // реальная модель от CLI — только когда работаем от конфига workspace
+  const act = S.providersData?.active;
+  if (!act || act.provider === 'config') $('#modelBtn').textContent = shortModel(init.model);
   updateEngineInfo();
   loadSessions();
 });
@@ -155,7 +156,7 @@ function onSlash(text) {
   return true;
 }
 
-/* ══════════ табло: выбор модели ══════════ */
+/* ══════════ табло: выбор источника и модели ══════════ */
 const MODELS = [
   { v: 'sonnet', label: 'ox-alpha', hint: 'OpenRouter · основной' },
   { v: 'default', label: 'по умолчанию', hint: 'ANTHROPIC_MODEL' },
@@ -164,43 +165,252 @@ const MODELS = [
 ];
 const modelBtn = $('#modelBtn');
 const modelMenu = $('#modelMenu');
+let modelCache = new Map(); // providerKey -> [{id,name}]
 
-function renderModelMenu() {
+async function renderModelMenu() {
+  modelMenu.innerHTML = '<div class="mm-loading">Загружаю источники…</div>';
+  modelMenu.hidden = false;
+  let data;
+  try {
+    data = await api('/providers');
+  } catch (e) {
+    modelMenu.innerHTML = `<div class="mm-loading">${esc(e.message)}</div>`;
+    return;
+  }
+  S.providersData = data;
+  if (!data.active.provider) data.active = { provider: 'config', model: '' };
+  const act = data.active;
+
+  const provRows = [
+    `<button class="mm-prov ${act.provider === 'config' ? 'active' : ''}" data-p="config">
+       <span class="mm-dot mm-dot-ok"></span><span>Конфиг workspace</span>
+       <span class="mm-hint">ox-alpha · env</span>
+     </button>`,
+    ...Object.entries(data.providers).map(([key, p]) => `
+      <button class="mm-prov ${act.provider === key ? 'active' : ''}" data-p="${esc(key)}">
+        <span class="mm-dot ${p.hasKey ? 'mm-dot-ok' : 'mm-dot-no'}" title="${p.hasKey ? `ключ ${esc(p.keyHint)}` : 'ключ не задан'}"></span>
+        <span>${esc(p.label)}</span>
+        <span class="mm-hint">${esc(p.type)}${p.hasKey ? '' : ' · нет ключа'}</span>
+        ${p.type === 'custom' ? `<span class="mm-x" data-del="${esc(key)}" title="Удалить источник">×</span>` : ''}
+      </button>`),
+    `<button class="mm-prov mm-add" data-p="__add"><span>＋ Свой источник (JSON)</span></button>`,
+  ].join('');
+
+  let modelsHtml = '';
+  if (act.provider === 'config') {
+    modelsHtml = `
+      ${MODELS.map((m) => `
+        <button data-v="${m.v}" class="${S.model === m.v ? 'active' : ''}">
+          <span>${m.label}</span><span class="mm-hint">${m.hint}</span>
+        </button>`).join('')}
+      <div class="mm-custom">
+        <input type="text" placeholder="свой id модели" id="modelCustom">
+        <button class="btn-run" id="modelCustomGo">OK</button>
+      </div>`;
+  } else {
+    const prov = data.providers[act.provider];
+    if (prov && !prov.hasKey && prov.type !== 'openrouter') {
+      modelsHtml = `
+        <div class="mm-keyrow">
+          <input type="password" id="mmKey" placeholder="API-ключ ${esc(prov.label)}">
+          <button class="btn-run" id="mmKeySave">Сохранить</button>
+        </div>
+        <div class="mm-hintblock">Ключ хранится на сервере (data/providers.json) и не попадает в git.</div>`;
+    } else {
+      modelsHtml = `
+        <div class="mm-searchrow">
+          <input type="text" id="mmSearch" placeholder="Поиск модели…">
+          <button class="btn-run" id="mmRefresh" title="Обновить список">⟳</button>
+        </div>
+        <div class="mm-list" id="mmList"><div class="mm-loading">Загружаю модели…</div></div>
+        <div class="mm-custom">
+          <input type="text" placeholder="или введи id вручную" id="modelCustom">
+          <button class="btn-run" id="modelCustomGo">OK</button>
+        </div>`;
+    }
+  }
+
   modelMenu.innerHTML = `
-    ${MODELS.map((m) => `
-      <button data-v="${m.v}" class="${S.model === m.v ? 'active' : ''}">
-        <span>${m.label}</span><span style="color:var(--faint);font-size:10px">${m.hint}</span>
-      </button>`).join('')}
-    <div class="mm-custom">
-      <input type="text" placeholder="свой id модели" id="modelCustom">
-      <button class="btn-run" id="modelCustomGo">OK</button>
-    </div>`;
+    <div class="mm-sec">Источник</div>
+    ${provRows}
+    <div class="mm-sec">Модель ${act.provider !== 'config' ? `· ${esc(data.providers[act.provider]?.label || act.provider)}` : ''}</div>
+    ${modelsHtml}`;
+
+  wireModelMenu(data);
+  if (act.provider !== 'config' && (!data.providers[act.provider] || data.providers[act.provider].hasKey || data.providers[act.provider].type === 'openrouter')) {
+    loadProviderModels(act.provider, act.model);
+  }
+}
+
+async function loadProviderModels(key, selectedId) {
+  const list = modelMenu.querySelector('#mmList');
+  if (!list) return;
+  if (!modelCache.has(key)) {
+    try {
+      const r = await api(`/providers/${encodeURIComponent(key)}/models`, { method: 'POST' });
+      modelCache.set(key, r.models);
+    } catch (e) {
+      list.innerHTML = `<div class="mm-loading">${esc(e.message)}</div>`;
+      return;
+    }
+  }
+  paintModelList(key, selectedId, '');
+}
+
+function paintModelList(key, selectedId, query) {
+  const list = modelMenu.querySelector('#mmList');
+  if (!list) return;
+  const all = modelCache.get(key) || [];
+  const q = query.trim().toLowerCase();
+  const items = q ? all.filter((m) => `${m.id} ${m.name || ''}`.toLowerCase().includes(q)) : all;
+  if (!items.length) {
+    list.innerHTML = `<div class="mm-loading">${q ? 'Не найдено' : 'Список пуст'}</div>`;
+    return;
+  }
+  list.innerHTML = items.slice(0, 300).map((m) => `
+    <button data-v="${esc(m.id)}" class="${m.id === selectedId ? 'active' : ''}">
+      <span>${esc(m.id)}</span>${m.name && m.name !== m.id ? `<span class="mm-hint">${esc(m.name).slice(0, 42)}</span>` : ''}
+    </button>`).join('');
+  list.querySelectorAll('button[data-v]').forEach((b) =>
+    b.addEventListener('click', () => selectModel(key, b.dataset.v)));
+}
+
+async function wireModelMenu(data) {
+  const act = data.active;
+  modelMenu.querySelectorAll('.mm-prov').forEach((b) => {
+    b.addEventListener('click', async (e) => {
+      if (e.target.dataset.del) {
+        if (!confirm(`Удалить источник «${e.target.dataset.del}»?`)) return;
+        try {
+          await api(`/providers/${encodeURIComponent(e.target.dataset.del)}`, { method: 'DELETE' });
+          toast('Источник удалён', 'ok');
+        } catch (err) { toast(err.message, 'err'); }
+        renderModelMenu();
+        return;
+      }
+      const p = b.dataset.p;
+      if (p === '__add') return openCustomProviderModal();
+      if (p === act.provider) return;
+      try {
+        await api('/providers-active', { method: 'PUT', body: { provider: p, model: '' } });
+        S.activeProvider = p;
+        if (p === 'config') updateTabloModelLabel();
+        else modelBtn.textContent = `${p} · …`;
+        renderModelMenu();
+      } catch (err) { toast(err.message, 'err'); }
+    });
+  });
+
+  // конфиг-модели (алиасы)
   modelMenu.querySelectorAll('button[data-v]').forEach((b) => {
-    b.addEventListener('click', () => setModel(b.dataset.v));
+    if (b.closest('.mm-list')) return;
+    b.addEventListener('click', () => selectModel('config', b.dataset.v));
   });
-  modelMenu.querySelector('#modelCustomGo').addEventListener('click', () => {
-    const v = modelMenu.querySelector('#modelCustom').value.trim();
-    if (v) setModel(v);
+
+  const customInput = modelMenu.querySelector('#modelCustom');
+  modelMenu.querySelector('#modelCustomGo')?.addEventListener('click', () => {
+    const v = customInput?.value.trim();
+    if (v) selectModel(act.provider, v);
   });
-  modelMenu.querySelector('#modelCustom').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      const v = e.target.value.trim();
-      if (v) setModel(v);
+  customInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); const v = e.target.value.trim(); if (v) selectModel(act.provider, v); }
+  });
+
+  // ключ встроенного источника
+  modelMenu.querySelector('#mmKeySave')?.addEventListener('click', async () => {
+    const keyVal = modelMenu.querySelector('#mmKey')?.value.trim();
+    if (!keyVal) return;
+    try {
+      await api(`/providers/${encodeURIComponent(act.provider)}`, { method: 'PUT', body: { apiKey: keyVal } });
+      toast('Ключ сохранён на сервере', 'ok');
+      modelCache.delete(act.provider);
+      renderModelMenu();
+    } catch (err) { toast(err.message, 'err'); }
+  });
+
+  // поиск и обновление списка
+  modelMenu.querySelector('#mmSearch')?.addEventListener('input', (e) => paintModelList(act.provider, act.model, e.target.value));
+  modelMenu.querySelector('#mmRefresh')?.addEventListener('click', () => {
+    modelCache.delete(act.provider);
+    loadProviderModels(act.provider, act.model);
+  });
+}
+
+async function selectModel(provider, model) {
+  try {
+    await api('/providers-active', { method: 'PUT', body: { provider, model } });
+    S.activeProvider = provider;
+    S.activeModel = model;
+    if (S.providersData) S.providersData.active = { provider, model };
+    if (provider === 'config') {
+      S.model = model;
+      localStorage.setItem('sc_model', model);
+    }
+    const label = updateTabloModelLabel();
+    modelMenu.hidden = true;
+    toast(`Модель: ${label} — применится к следующему сообщению`, '', 2600);
+  } catch (e) {
+    toast(e.message, 'err');
+  }
+}
+
+/** Подпись на табло: «ox-alpha» для конфига или «модель · источник». */
+function updateTabloModelLabel() {
+  const act = S.providersData?.active || { provider: 'config', model: '' };
+  if (act.provider && act.provider !== 'config') {
+    modelBtn.textContent = `${act.model || '…'} · ${S.providersData?.providers?.[act.provider]?.label || act.provider}`;
+    return modelBtn.textContent;
+  }
+  const label = MODELS.find((m) => m.v === S.model)?.label || S.model;
+  modelBtn.textContent = label;
+  return label;
+}
+
+function openCustomProviderModal() {
+  const body = document.createElement('div');
+  body.innerHTML = `
+    <div class="field">
+      <label>Описание источника в JSON</label>
+      <textarea id="cpJson" class="editor-tall" spellcheck="false" style="min-height:220px">{
+  "name": "my-gateway",
+  "baseURL": "https://api.example.com",
+  "apiKey": "",
+  "models": ["model-id-1", "model-id-2"]
+}</textarea>
+      <div class="hint">Anthropic-совместимый шлюз: <code>baseURL</code> — корень API (Claude Code добавит /v1/messages).
+      Поля <code>models</code> необязательно — если пусто, сервер попробует <code>GET baseURL/v1/models</code>.
+      Примеры baseURL: OpenRouter <code>https://openrouter.ai/api</code>, DeepSeek <code>https://api.deepseek.com/anthropic</code>.</div>
+    </div>
+    <div class="form-error" id="cpErr"></div>`;
+  const cancel = mkBtn2('Отмена', 'btn-secondary', () => modal.close());
+  const ok = mkBtn2('Добавить', 'btn-primary notch-sm', async () => {
+    const err = body.querySelector('#cpErr');
+    err.classList.remove('show');
+    try {
+      await api('/providers-custom', { method: 'POST', body: { json: body.querySelector('#cpJson').value } });
+      modal.close();
+      toast('Источник добавлен', 'ok');
+      renderModelMenu();
+    } catch (e) {
+      err.textContent = e.message;
+      err.classList.add('show');
     }
   });
+  const modal = openModal({ title: 'Свой источник моделей', body, foot: [cancel, ok] });
 }
-function setModel(v) {
-  S.model = v;
-  localStorage.setItem('sc_model', v);
-  modelBtn.textContent = MODELS.find((m) => m.v === v)?.label || v;
-  modelMenu.hidden = true;
-  toast(`Модель: ${MODELS.find((m) => m.v === v)?.label || v} — применится к следующему сообщению`, '', 2600);
+
+function mkBtn2(label, cls, onClick) {
+  const b = document.createElement('button');
+  b.className = cls;
+  b.textContent = label;
+  b.addEventListener('click', onClick);
+  return b;
 }
+
 modelBtn.addEventListener('click', (e) => {
   e.stopPropagation();
-  renderModelMenu();
-  modelMenu.hidden = !modelMenu.hidden;
+  if (modelMenu.hidden) renderModelMenu();
+  else modelMenu.hidden = true;
 });
 document.addEventListener('click', (e) => {
   if (!modelMenu.hidden && !modelMenu.contains(e.target)) modelMenu.hidden = true;
@@ -216,7 +426,13 @@ $('#stopBtn').addEventListener('click', () => {
 const permSel = $('#permMode');
 permSel.value = S.permMode;
 permSel.classList.toggle('danger', S.permMode === 'bypassPermissions');
+let permBootDone = false; // Chrome при перезагрузке восстанавливает форму и кидает change — игнорируем
+setTimeout(() => { permBootDone = true; }, 800);
 permSel.addEventListener('change', () => {
+  if (!permBootDone) {
+    permSel.value = S.permMode;
+    return;
+  }
   if (permSel.value === 'bypassPermissions' && S.permMode !== 'bypassPermissions') {
     const ok = confirm('РЕЖИМ ПОЛНОГО ДОСТУПА (аналог claude --dangerously-skip-permissions):\nагент будет выполнять любые действия — запись файлов, команды — без подтверждений.\n\nВключить?');
     if (!ok) {
@@ -363,7 +579,14 @@ $('.brand').addEventListener('click', () => {
   await Promise.all([rail.loadMcp(), rail.loadSkills(), rail.loadPlugins()]);
   loadSessions();
 
-  modelBtn.textContent = MODELS.find((m) => m.v === S.model)?.label || S.model;
+  // активный источник моделей с сервера
+  try {
+    S.providersData = await api('/providers');
+    if (S.providersData.active?.provider && S.providersData.active.provider !== 'config') {
+      S.activeProvider = S.providersData.active.provider;
+    }
+  } catch { /* меню подтянет при открытии */ }
+  updateTabloModelLabel();
   updateTablo();
   updateEngineInfo();
   setStatus('ready', 'ГОТОВ');

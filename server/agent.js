@@ -1,5 +1,5 @@
 import { query } from '@anthropic-ai/claude-agent-sdk';
-import { WORKSPACE, readMcp, saveSession, resolvePluginPaths, readSystemPrompt } from './store.js';
+import { WORKSPACE, readMcp, saveSession, resolvePluginPaths, readSystemPrompt, readProviders } from './store.js';
 
 const PERM_TIMEOUT_MS = 180_000;
 
@@ -99,7 +99,25 @@ export class ChatConnection {
       // Локальные плагины, выбранные в панели «Плагины»
       const pluginPaths = resolvePluginPaths(Array.isArray(plugins) ? plugins : []);
       if (pluginPaths.length) options.plugins = pluginPaths;
-      if (model && model !== 'default') options.model = model;
+
+      // Активный источник моделей: перекрываем base URL и ключ процесса CLI
+      const { active, providers } = readProviders();
+      if (active.provider && active.provider !== 'config') {
+        const prov = providers[active.provider];
+        if (prov?.baseURL && prov?.apiKey) {
+          options.env = {
+            ...process.env,
+            ANTHROPIC_BASE_URL: prov.baseURL,
+            ANTHROPIC_AUTH_TOKEN: prov.apiKey,
+            ANTHROPIC_API_KEY: prov.apiKey,
+          };
+          if (active.model) options.model = active.model;
+        } else {
+          this.send({ t: 'stderr', v: `Источник «${active.provider}» не настроен (нет ключа) — используется конфиг workspace` });
+        }
+      } else if (model && model !== 'default') {
+        options.model = model;
+      }
       if (sessionId) options.resume = sessionId;
 
       const q = query({ prompt: text, options });

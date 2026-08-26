@@ -7,6 +7,7 @@ import {
   readSkills, writeSkill, deleteSkill,
   readSettingsRaw, writeSettingsRaw, readClaudeMd, writeClaudeMd,
   readSystemPrompt, writeSystemPrompt,
+  readProviders, writeProviders,
   readInstalledPlugins, readUserEnabledPlugins, readPluginSelection,
   writePluginSelection, readPluginStore,
 } from './store.js';
@@ -102,6 +103,175 @@ router.put('/config/plugins', (req, res) => {
 router.get('/plugins/store', (req, res) => {
   res.json(readPluginStore());
 });
+
+/* ---------- Providers (источники моделей) ---------- */
+
+const BUILTIN_PROVIDERS = {
+  openrouter: {
+    type: 'openrouter', label: 'OpenRouter',
+    baseURL: 'https://openrouter.ai/api', apiKey: '',
+  },
+  deepseek: {
+    type: 'deepseek', label: 'DeepSeek',
+    baseURL: 'https://api.deepseek.com/anthropic', apiKey: '',
+  },
+};
+
+function ensureBuiltins(data) {
+  for (const [key, def] of Object.entries(BUILTIN_PROVIDERS)) {
+    if (!data.providers[key]) data.providers[key] = { ...def };
+  }
+  return data;
+}
+
+/** Маскируем ключи — наружу отдаём только признак наличия и хвост. */
+function sanitize(data) {
+  const providers = {};
+  for (const [key, p] of Object.entries(data.providers)) {
+    providers[key] = {
+      type: p.type || 'custom',
+      label: p.label || key,
+      baseURL: p.baseURL || '',
+      hasKey: !!p.apiKey,
+      keyHint: p.apiKey ? `…${p.apiKey.slice(-4)}` : '',
+      models: Array.isArray(p.models) ? p.models : [],
+    };
+  }
+  return { active: data.active, providers };
+}
+
+router.get('/providers', (req, res) => {
+  res.json(sanitize(ensureBuiltins(readProviders())));
+});
+
+router.put('/providers/:key', (req, res) => {
+  const key = String(req.params.key || '').trim();
+  if (!/^[a-z0-9][a-z0-9_-]{0,40}$/i.test(key)) {
+    return res.status(400).json({ error: 'Недопустимое имя источника' });
+  }
+  const data = ensureBuiltins(readProviders());
+  const prev = data.providers[key] || {};
+  const b = req.body || {};
+  const next = {
+    type: b.type || prev.type || (key === 'openrouter' ? 'openrouter' : key === 'deepseek' ? 'deepseek' : 'custom'),
+    label: b.label || prev.label || key,
+    baseURL: typeof b.baseURL === 'string' && b.baseURL.trim() ? b.baseURL.trim().replace(/\/+$/, '') : prev.baseURL || '',
+    apiKey: typeof b.apiKey === 'string' ? b.apiKey.trim() : prev.apiKey || '',
+    models: Array.isArray(b.models) ? b.models.map(String).slice(0, 200) : prev.models || [],
+  };
+  if (!next.baseURL && next.type !== 'openrouter' && next.type !== 'deepseek') {
+    return res.status(400).json({ error: 'Нужен baseURL источника' });
+  }
+  data.providers[key] = next;
+  writeProviders(data);
+  res.json({ ok: true, providers: sanitize(data).providers });
+});
+
+router.delete('/providers/:key', (req, res) => {
+  const key = req.params.key;
+  if (key in BUILTIN_PROVIDERS) return res.status(400).json({ error: 'Встроенный источник нельзя удалить' });
+  const data = ensureBuiltins(readProviders());
+  delete data.providers[key];
+  if (data.active.provider === key) data.active = { provider: 'config', model: '' };
+  writeProviders(data);
+  res.json({ ok: true });
+});
+
+router.put('/providers-active', (req, res) => {
+  const { provider, model } = req.body || {};
+  if (provider !== 'config') {
+    const data = ensureBuiltins(readProviders());
+    if (!data.providers[provider]) return res.status(404).json({ error: 'Источник не найден' });
+    data.active = { provider, model: String(model || '').slice(0, 200) };
+    writeProviders(data);
+  } else {
+    const data = readProviders();
+    data.active = { provider: 'config', model: '' };
+    writeProviders(data);
+  }
+  res.json({ ok: true, active: readProviders().active });
+});
+
+/** Живой список моделей из API источника. */
+router.post('/providers/:key/models', async (req, res) => {
+  const data = ensureBuiltins(readProviders());
+  const prov = data.providers[req.params.key];
+  if (!prov) return res.status(404).json({ error: 'Источник не найден' });
+  if (!prov.apiKey && prov.type !== 'openrouter') {
+    return res.status(400).json({ error: 'Сначала сохрани API-ключ источника' });
+  }
+  try {
+    const models = await fetchModelList(prov);
+    if (!models.length) {
+      return res.status(502).json({ error: 'Источник не вернул список моделей — добавь модели вручную в JSON' });
+    }
+    res.json({ models });
+  } catch (e) {
+    res.status(502).json({ error: `Не удалось получить список: ${e.message}` });
+  }
+});
+
+/** Разбор произвольного источника из JSON. */
+router.post('/providers-custom', (req, res) => {
+  let cfg;
+  try {
+    cfg = typeof req.body?.json === 'string' ? JSON.parse(req.body.json) : req.body?.json;
+  } catch {
+    return res.status(400).json({ error: 'Некорректный JSON' });
+  }
+  if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) {
+    return res.status(400).json({ error: 'JSON должен быть объектом' });
+  }
+  if (typeof cfg.baseURL !== 'string' || !cfg.baseURL.trim()) {
+    return res.status(400).json({ error: 'В JSON нужно поле "baseURL"' });
+  }
+  let slug = String(cfg.name || 'custom')
+    .toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'custom';
+  const data = ensureBuiltins(readProviders());
+  let key = slug;
+  let i = 2;
+  while (data.providers[key]) key = `${slug}-${i++}`;
+  data.providers[key] = {
+    type: 'custom',
+    label: String(cfg.label || cfg.name || key).slice(0, 60),
+    baseURL: cfg.baseURL.trim().replace(/\/+$/, ''),
+    apiKey: String(cfg.apiKey || ''),
+    models: Array.isArray(cfg.models) ? cfg.models.map(String).slice(0, 200) : [],
+  };
+  writeProviders(data);
+  res.json({ ok: true, key, providers: sanitize(data).providers });
+});
+
+async function fetchModelList(prov) {
+  const headers = {};
+  if (prov.apiKey) headers.Authorization = `Bearer ${prov.apiKey}`;
+  const urls = [];
+  if (prov.type === 'openrouter') {
+    urls.push('https://openrouter.ai/api/v1/models');
+  } else if (prov.type === 'deepseek') {
+    urls.push('https://api.deepseek.com/models');
+  } else {
+    const base = String(prov.baseURL || '').replace(/\/+$/, '');
+    urls.push(`${base}/v1/models`, `${base}/models`);
+  }
+  for (const url of urls) {
+    try {
+      const r = await fetch(url, { headers, signal: AbortSignal.timeout(15_000) });
+      if (!r.ok) continue;
+      const j = await r.json();
+      const arr = Array.isArray(j) ? j : j.data || j.models || [];
+      const models = arr
+        .map((m) => (typeof m === 'string' ? { id: m } : { id: m.id || m.name, name: m.name || m.id }))
+        .filter((m) => m.id)
+        .sort((a, b) => a.id.localeCompare(b.id));
+      if (models.length) return models;
+    } catch { /* пробуем следующий вариант URL */ }
+  }
+  if (prov.type === 'deepseek' && !prov.apiKey) {
+    return [{ id: 'deepseek-chat' }, { id: 'deepseek-reasoner' }];
+  }
+  return (prov.models || []).map((id) => ({ id }));
+}
 
 /* ---------- CLAUDE.md & settings.json ---------- */
 
