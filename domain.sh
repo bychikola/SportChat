@@ -28,14 +28,18 @@ if [[ -z "$DOMAIN" ]]; then
   read -r DOMAIN
 fi
 DOMAIN="$(echo "$DOMAIN" | tr -d '[:space:]' | sed 's|^https\?://||; s|/.*$||')"
-[[ -n "$DOMAIN" ]] || die "Домен не указан"
-
-# 1. .env
-if [[ -f .env ]] && grep -q '^DOMAIN=' .env; then
-  sed -i "s|^DOMAIN=.*|DOMAIN=$DOMAIN|" .env
-else
-  echo "DOMAIN=$DOMAIN" >> .env
+# строгая валидация: только FQDN из букв/цифр/точек/дефисов — ничего,
+# что могло бы интерпретироваться при записи в .env
+if ! grep -Eq '^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+$' <<<"$DOMAIN"; then
+  die "Некорректный домен: «$DOMAIN». Ожидается chat.example.com"
 fi
+
+# 1. .env — значение передаётся как переменная awk, а не встраивается в скрипт
+awk -v d="$DOMAIN" '
+  /^DOMAIN=/ { print "DOMAIN=" d; seen=1; next }
+  { print }
+  END { if (!seen) print "DOMAIN=" d }
+' .env > .env.tmp && mv .env.tmp .env
 info "DOMAIN=$DOMAIN записан в .env"
 
 # 2. DNS
