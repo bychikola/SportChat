@@ -24,14 +24,30 @@ die()  { printf "${C_R}✗ %s${C_0}\n" "$*" >&2; exit 1; }
 
 DOMAIN="${1:-}"
 if [[ -z "$DOMAIN" ]]; then
-  printf "${C_B}Домен${C_0} (например chat.example.com): "
+  printf "${C_B}Домен${C_0} (например chat.example.com или спортчат.рф): "
   read -r DOMAIN
 fi
 DOMAIN="$(echo "$DOMAIN" | tr -d '[:space:]' | sed 's|^https\?://||; s|/.*$||')"
+
+# IDN-домены (кириллица, .рф и т.п.) → punycode (xn--…), его понимают DNS и Caddy
+if [[ "$DOMAIN" =~ [^A-Za-z0-9.-] ]]; then
+  PUNY=""
+  if command -v python3 >/dev/null 2>&1; then
+    PUNY="$(python3 -c 'import sys; print(sys.argv[1].encode("idna").decode())' "$DOMAIN" 2>/dev/null || true)"
+  elif command -v idn2 >/dev/null 2>&1; then
+    PUNY="$(echo "$DOMAIN" | idn2 2>/dev/null || true)"
+  fi
+  if [[ -z "$PUNY" ]]; then
+    die "Домен на кириллице, а инструмента для перевода нет. Установи python3: sudo apt install python3 — или укажи домен уже в виде xn--…"
+  fi
+  info "IDN: $DOMAIN → $PUNY"
+  DOMAIN="$PUNY"
+fi
+
 # строгая валидация: только FQDN из букв/цифр/точек/дефисов — ничего,
 # что могло бы интерпретироваться при записи в .env
 if ! grep -Eq '^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+$' <<<"$DOMAIN"; then
-  die "Некорректный домен: «$DOMAIN». Ожидается chat.example.com"
+  die "Некорректный домен: «$DOMAIN». Ожидается chat.example.com или спортчат.рф"
 fi
 
 # 1. .env — значение передаётся как переменная awk, а не встраивается в скрипт;
