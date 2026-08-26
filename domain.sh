@@ -34,13 +34,16 @@ if ! grep -Eq '^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-
   die "Некорректный домен: «$DOMAIN». Ожидается chat.example.com"
 fi
 
-# 1. .env — значение передаётся как переменная awk, а не встраивается в скрипт
+# 1. .env — значение передаётся как переменная awk, а не встраивается в скрипт;
+# umask 077 + chmod 600: файл содержит ключ, читать может только root
+(umask 077
 awk -v d="$DOMAIN" '
   /^DOMAIN=/ { print "DOMAIN=" d; seen=1; next }
   { print }
   END { if (!seen) print "DOMAIN=" d }
-' .env > .env.tmp && mv .env.tmp .env
-info "DOMAIN=$DOMAIN записан в .env"
+' .env > .env.tmp && mv .env.tmp .env)
+chmod 600 .env 2>/dev/null || true
+info "DOMAIN=$DOMAIN записан в .env (права 600)"
 
 # 2. DNS
 server_ip="$(curl -fs ifconfig.me 2>/dev/null || echo '?')"
