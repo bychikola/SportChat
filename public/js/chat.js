@@ -19,6 +19,22 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
     if (force || nearBottom()) stageScroll.scrollTop = stageScroll.scrollHeight;
   };
 
+  // Прокрутка на КАЖДУЮ дельту = принудительная раскладка (layout) на каждый
+  // токен — при длинном ходу главный поток встаёт. Троттлим до ~8 раз/сек.
+  let scrollDirty = false;
+  let scrollTimer = null;
+  function requestScroll() {
+    scrollDirty = true;
+    if (scrollTimer) return;
+    scrollTimer = setTimeout(() => {
+      scrollTimer = null;
+      if (scrollDirty) {
+        scrollDirty = false;
+        scrollDown();
+      }
+    }, 120);
+  }
+
   /* ── элементы сообщений ── */
   function addUserBubble(text) {
     const el = document.createElement('div');
@@ -122,7 +138,7 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
     entry.buf += chunk;
     if (entry.buf.length > STREAM_PREVIEW_LIMIT) return; // превью урезано, финал всё перерисует
     entry.seg.insertBefore(document.createTextNode(chunk), entry.caret);
-    scrollDown();
+    requestScroll();
   }
 
   /* ── мышление ── */
@@ -336,9 +352,9 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
         if (!entry || entry.kind !== 'thinking') {
           entry = [...pendingSegs].reverse().find((s) => s.kind === 'thinking') || pushThinkingSegment(msg.index);
         }
+        // инкрементально, как ответ: перезапись всего буфера на каждую дельту — O(n²)
         entry.buf += msg.v;
-        entry.textEl.textContent = entry.buf;
-        entry.textEl.scrollTop = entry.textEl.scrollHeight;
+        if (entry.buf.length <= 20_000) entry.textEl.appendChild(document.createTextNode(msg.v));
         break;
       }
       case 'tool_input_delta': {

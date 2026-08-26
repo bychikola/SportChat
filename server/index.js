@@ -28,7 +28,12 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.static(path.join(ROOT, 'public')));
+// без кэша статики: иначе браузер держит старый JS/CSS после обновлений
+app.use(express.static(path.join(ROOT, 'public'), {
+  etag: false,
+  maxAge: 0,
+  setHeaders: (res) => res.set('Cache-Control', 'no-cache, no-store, must-revalidate'),
+}));
 app.use('/api', apiRouter);
 
 app.get('*', (req, res, next) => {
