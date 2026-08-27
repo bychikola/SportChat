@@ -68,7 +68,7 @@ sudo bash domain.sh chat.example.com
 | **Чат** | Стриминговые ответы, markdown, блоки «Размышление», карточки инструментов с результатами |
 | **Табло** (верх) | Живой статус, **источники моделей**: конфиг workspace, OpenRouter (ключ → живой список всех моделей), DeepSeek, свой источник в JSON; токены, стоимость, ходы |
 | **Эпизоды** | Каждое действие агента вживую: WebSearch, Read, Bash, вызовы MCP |
-| **MCP** | Подключение серверов (stdio / http / sse) → `workspace/.mcp.json` |
+| **MCP** | Подключение серверов (stdio / http / sse) → `workspace/.mcp.json`. В комплекте: **SStats.net Football API** — 14 инструментов для реальной футбольной статистики |
 | **Skills** | Создание и редактирование навыков → `workspace/.claude/skills/<имя>/SKILL.md` |
 | **Плагины** | Магазин маркетплейсов Claude Code, установка и подключение плагинов к агенту |
 | **Консоль** | Неинтерактивные команды CLI: `claude mcp list`, `claude doctor`, … |
@@ -99,6 +99,26 @@ sudo bash domain.sh chat.example.com
 Подключённые плагины передаются в SDK как локальные и загружаются со следующим
 сообщением (первый запуск с полным набором может занять минуту — грузятся их
 MCP-серверы).
+
+## MCP-сервер SStats.net (футбольные данные)
+
+Кастомный MCP-сервер (`sstats_mcp/server.mjs`) поверх официального
+OpenAPI-документа SStats (`sstats_mcp/v1.yaml`) — реальные матчи, статистика,
+коэффициенты, составы, турнирные таблицы:
+
+| Инструмент | Что даёт |
+|---|---|
+| `sstats_search_matches` | Поиск матчей: лига/дата/интервал/команда/H2H/статус, кэфы 1X2 и тоталы |
+| `sstats_get_match` | Полный матч: статистика, составы, события, стадион, судья, кэфы закрытия |
+| `sstats_match_preview_stats` | Предматчевая форма команд (последние N матчей, xG, тоталы) |
+| `sstats_season_standings` / `sstats_league_table` | Турнирные таблицы |
+| `sstats_odds` / `sstats_live_odds` | Доматчевые и live-коэффициенты по букмекерам |
+| `sstats_injuries` / `sstats_match_text_summary` | Пропуски и текстовая сводка |
+| `sstats_teams` / `sstats_players` / `sstats_leagues` / `sstats_bookmakers` | Справочники |
+| `sstats_account` | Проверка ключа |
+
+Ключ хранится в `data/sstats-key.json` (вне git) или env `SSTATS_API_KEY`.
+Справочники кэшируются 10 минут, мягкий троттлинг от лимитов API.
 
 ## Источники моделей
 

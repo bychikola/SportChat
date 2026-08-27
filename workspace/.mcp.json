@@ -3,11 +3,12 @@
     "filesystem": {
       "type": "stdio",
       "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-filesystem",
-        "C:\\Users\\Admin\\Documents\\SportChat\\workspace"
-      ]
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "C:/Users/Admin/Documents/SportChat/workspace"]
+    },
+    "sstats": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["../sstats_mcp/server.mjs"]
     }
   }
 }
