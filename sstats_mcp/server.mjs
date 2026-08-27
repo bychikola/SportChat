@@ -43,6 +43,15 @@ const cache = new Map();
 const throttle = { last: 0 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/** Маскируем ключ, где бы он ни встретился: в JSON-ответах, ошибках, URL. */
+const SCRUB_KEY = /("apiKey"\s*:\s*")[^"]+(")/g;
+const SCRUB_QUERY = /([?&]apikey=)[^&\s"]+/g;
+function scrub(s) {
+  return String(s ?? '')
+    .replace(SCRUB_KEY, '$1***$2')
+    .replace(SCRUB_QUERY, '$1***');
+}
+
 async function apiGet(p, params = {}, { cacheKey = null, ttl = 0 } = {}) {
   if (cacheKey) {
     const hit = cache.get(cacheKey);
@@ -52,13 +61,15 @@ async function apiGet(p, params = {}, { cacheKey = null, ttl = 0 } = {}) {
   if (wait > 0) await sleep(wait);
   throttle.last = Date.now();
 
+  // SStats принимает ключ ТОЛЬКО в query-строке (OpenAPI: apiKey in query).
+  // Сам URL нигде не логируется, а в ошибки ключ не попадает (scrub ниже).
   const q = new URLSearchParams({ ...params, apikey: API_KEY });
   const url = `${BASE}${p}?${q}`;
   let res;
   try {
     res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
   } catch (e) {
-    throw new Error(`Сеть: не удалось обратиться к SStats (${e.message})`);
+    throw new Error(`Сеть: не удалось обратиться к SStats (${scrub(e.message)})`);
   }
   const text = await res.text();
   if (!res.ok) {
@@ -67,13 +78,13 @@ async function apiGet(p, params = {}, { cacheKey = null, ttl = 0 } = {}) {
       const j = JSON.parse(text);
       detail = j.error?.message || j.message || j.status || '';
     } catch { /* тело не JSON */ }
-    throw new Error(`SStats HTTP ${res.status}${detail ? `: ${detail}` : ''}`);
+    throw new Error(`SStats HTTP ${res.status}${detail ? `: ${scrub(detail)}` : ''}`);
   }
   let data;
   try {
     data = JSON.parse(text);
   } catch {
-    throw new Error(`SStats: не-JSON ответ (${text.slice(0, 120)})`);
+    throw new Error(`SStats: не-JSON ответ (${scrub(text.slice(0, 120))})`);
   }
   if (cacheKey && ttl > 0) cache.set(cacheKey, { expires: Date.now() + ttl, data });
   return data;
@@ -96,11 +107,14 @@ function pack(raw) {
     json = String(data).slice(0, MAX_BODY);
   }
   if (json.length > MAX_BODY) json = `${json.slice(0, MAX_BODY)}\n…(обрезано, было ${json.length} симв.)`;
+  // ВАЖНО: /Account/Info возвращает сам apiKey — маскируем, чтобы ключ
+  // не попадал в контекст модели и в чат
+  json = scrub(json);
   const head = meta ? `status=${meta.status} count=${meta.count}\n` : '';
   return { content: [{ type: 'text', text: head + json }] };
 }
 
-const errMsg = (e) => ({ content: [{ type: 'text', text: `❌ ${e.message}` }], isError: true });
+const errMsg = (e) => ({ content: [{ type: 'text', text: `❌ ${scrub(e.message)}` }], isError: true });
 
 /* ── сервер ── */
 const server = new McpServer({ name: 'sstats-football', version: '1.0.0' });
