@@ -567,7 +567,12 @@ $$('.tbtn[data-open]').forEach((btn) => {
   });
 });
 $('#railToggle').addEventListener('click', () => document.body.classList.toggle('rail-open'));
+$('#sideToggle').addEventListener('click', () => document.body.classList.toggle('side-open'));
 
+// тап по подложке закрывает выдвижные панели (мобильные)
+$('#drawerBackdrop').addEventListener('click', () => {
+  document.body.classList.remove('rail-open', 'side-open');
+});
 // кнопка сайдбара на узких экранах: тап по бренду открывает историю
 $('.brand').addEventListener('click', () => {
   if (window.matchMedia('(max-width: 1023px)').matches) {

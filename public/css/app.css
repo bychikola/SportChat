@@ -931,3 +931,144 @@ body.rail-hidden .rail { overflow: hidden; border-left: none; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* ═══════════ МОБИЛЬНАЯ АДАПТАЦИЯ ═══════════ */
+
+/* подложка выдвижных панелей: скрыта по умолчанию, включается классами body */
+.drawer-backdrop { display: none; }
+
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
+html { -webkit-text-size-adjust: 100%; }
+body { -webkit-tap-highlight-color: transparent; }
+
+/* ── табло: два ряда на узких экранах ── */
+@media (max-width: 899px) {
+  #app { grid-template-rows: auto minmax(0, 1fr) 27px; }
+  .tablo {
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    padding: calc(8px + var(--sat)) 10px 6px;
+    padding-right: calc(10px + var(--sar));
+    padding-left: calc(10px + var(--sal));
+  }
+  .brand { margin-right: auto; }
+  .brand-name { font-size: 16px; }
+  .tablo-actions { gap: 2px; }
+  .tbtn { min-width: 40px; min-height: 40px; justify-content: center; padding: 8px; }
+  .burger { margin-left: -4px; }
+  /* вторая строка: статус + метрики, горизонтальная прокрутка */
+  .tablo-center {
+    order: 3;
+    /* flex-basis 100% — гарантированный перенос на вторую строку
+       (width:100% игнорируется, т.к. базовое правило даёт flex-basis 0%) */
+    flex: 1 0 100%;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 4px 2px 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .tablo-center::-webkit-scrollbar { display: none; }
+  .tablo-center::before { display: none; }
+  .tablo-cell { min-width: auto; flex: none; }
+  .tablo-val { font-size: 12px; }
+  .tablo-cap { font-size: 8px; }
+  .status-cell { padding-right: 2px; }
+  .turn-timer { white-space: nowrap; }
+  .tablo-sep { height: 14px; flex: none; }
+
+  .drawer-backdrop {
+    display: block;
+    position: fixed;
+    top: 0; right: 0; bottom: 0; left: 0;
+    z-index: 70;
+    background: rgba(4, 7, 5, .55);
+    backdrop-filter: blur(2px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .22s ease;
+  }
+  body.rail-open .drawer-backdrop,
+  body.side-open .drawer-backdrop {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  /* панели поверх подложки, с safe-area */
+  .rail {
+    top: 0;
+    bottom: 0;
+    width: min(400px, 94vw);
+    padding-bottom: var(--sab);
+  }
+  .side {
+    top: 0;
+    bottom: 0;
+    width: min(320px, 88vw);
+    padding-bottom: var(--sab);
+  }
+}
+
+/* ── узкие телефоны (<640px) ── */
+@media (max-width: 640px) {
+  .messages { padding: 14px 10px 6px; gap: 18px; }
+  .msg-ai .bubble, .msg-user .bubble { font-size: 14px; padding: 10px 13px; }
+  .bubble-wrap { max-width: 100% !important; }
+  .composer-wrap { padding: 6px 10px calc(8px + var(--sab)); }
+  .composer textarea { font-size: 15px; padding: 12px 14px 4px; }
+  .under-composer { gap: 10px; font-size: 11.5px; }
+  .uc-item { gap: 5px; }
+  .uc-session { display: none; } /* не хватает места — сессия в истории */
+
+  .empty-state { padding: 6vh 16px 30px; gap: 26px; }
+  .hero-title { font-size: 26px; }
+  .hero-sub { font-size: 13.5px; }
+  .chip { padding: 7px 12px; font-size: 12.5px; }
+  .cap-card { min-width: 120px; padding: 8px 12px; }
+
+  .tool-card .tc-summary { max-width: 90px; }
+  .tc-head { padding: 8px 10px; gap: 8px; }
+  .tc-pre { font-size: 10.5px; }
+  .st { padding: 2px 6px; font-size: 8.5px; }
+
+  .overlay { padding: 10px; }
+  .modal, .modal-lg { width: 100%; max-width: none; max-height: 92vh; }
+  .modal-body { padding: 14px; gap: 12px; }
+  .modal-head { padding: 12px 14px; }
+  .field-row { grid-template-columns: 1fr; }
+  .seg-tabs { padding: 0 14px; overflow-x: auto; }
+  .seg-tab { white-space: nowrap; }
+
+  .model-menu {
+    /* fixed — иначе absolute внутри скроллящейся строки метрик
+       позиционируется от прокрученного контейнера и уезжает за экран */
+    position: fixed;
+    top: calc(64px + var(--sat));
+    left: 4vw; right: 4vw;
+    width: auto;
+    max-width: none;
+    max-height: 62vh;
+    transform: none;
+    min-width: 0;
+  }
+  .model-menu button > span:first-child {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .mm-list { max-height: 40vh; }
+
+  .statusbar { gap: 10px; padding: 0 10px; font-size: 9px; height: 27px; }
+  .statusbar .sb-item:last-child { display: none; }
+  .toasts { right: 12px; left: 12px; bottom: calc(44px + var(--sab)); max-width: none; }
+
+  .perm-actions { flex-direction: column; }
+  .perm-actions .btn-primary, .perm-actions .btn-secondary, .perm-actions .btn-danger { width: 100%; }
+  .divider-line { font-size: 9px; }
+}
