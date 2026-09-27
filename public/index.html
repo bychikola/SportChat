@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
-<title>SportChat — аналитика на реальном Claude Code</title>
-<meta name="description" content="Чат-аналитик спортивных событий на движке настоящего Claude Code: MCP, навыки, права, консоль.">
+<title>SportChat AI — аналитика спортивных событий</title>
+<meta name="description" content="Чат-аналитик спортивных событий: разборы матчей, вероятности и value в линии. MCP, навыки, права, консоль.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%230A100C'/%3E%3Cpath d='M13 3 6.5 13.5H11L10 21l7.5-11H12z' fill='%23FFB454'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -34,6 +34,7 @@
   <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 5 5.8v5.4c0 4.4 3 8 7 9.3 4-1.3 7-4.9 7-9.3V5.8L12 3zM12 10.2v3.6"/></symbol>
   <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8.4" r="3.6"/><path d="M5 20.2c.8-3.4 3.6-5.3 7-5.3s6.2 1.9 7 5.3"/></symbol>
   <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/><path d="m8.5 14.5 2 2 4-4"/></symbol>
 </svg>
 
 <div id="app">
@@ -46,7 +47,7 @@
     <div class="brand">
       <svg class="brand-bolt"><use href="#i-bolt"/></svg>
       <span class="brand-name">СПОРТЧАТ</span>
-      <span class="brand-sub">Claude&nbsp;Code&nbsp;Edition</span>
+      <span class="brand-sub">AI</span>
     </div>
 
     <div class="tablo-center">
@@ -79,13 +80,16 @@
     </div>
 
     <div class="tablo-actions">
+      <button id="eventsToggle" class="tbtn" title="Предстоящие события">
+        <svg><use href="#i-cal"/></svg><span class="hide-wide">События</span>
+      </button>
       <button class="tbtn" data-open="mcp" title="MCP-серверы">
         <svg><use href="#i-plug"/></svg><span class="hide-wide">MCP</span>
       </button>
       <button class="tbtn" data-open="skills" title="Навыки (Skills)">
         <svg><use href="#i-bolt"/></svg><span class="hide-wide">Skills</span>
       </button>
-      <button class="tbtn" data-open="cli" title="Консоль Claude CLI">
+      <button class="tbtn" data-open="cli" title="Консоль CLI">
         <svg><use href="#i-term"/></svg><span class="hide-wide">Консоль</span>
       </button>
       <button class="tbtn" data-open="settings" title="Настройки движка">
@@ -103,6 +107,9 @@
       <button id="newChatBtn" class="btn-new notch">
         <svg><use href="#i-plus"/></svg> Новый разбор
       </button>
+      <button id="sideClose" class="drawer-x only-mobile" title="Закрыть историю" aria-label="Закрыть историю">
+        <svg><use href="#i-x"/></svg>
+      </button>
     </div>
     <div class="side-section">
       <div class="side-title">
@@ -113,13 +120,6 @@
         <div class="empty-note">Пока пусто. Начни первый разбор.</div>
       </div>
     </div>
-    <div class="side-foot">
-      <div class="engine-badge">
-        <span class="engine-pulse"></span> REAL CLAUDE CODE
-        <span id="ccVersion" class="engine-ver"></span>
-      </div>
-      <div id="wsPath" class="ws-path" title="">workspace/</div>
-    </div>
   </aside>
 
   <!-- ═══════════ Стадия чата ═══════════ -->
@@ -129,8 +129,8 @@
         <div class="hero-mark">
           <svg class="hero-bolt"><use href="#i-bolt"/></svg>
           <h1 class="hero-title">РАЗБОР НАЧИНАЕТСЯ ЗДЕСЬ</h1>
-          <p class="hero-sub">Спроси о матче, лиге или игроке — внутри работает настоящий
-            Claude&nbsp;Code: поиск в интернете, файлы, MCP-серверы и навыки.</p>
+          <p class="hero-sub">Спроси о матче, лиге или игроке — внутри работает AI-аналитик:
+            поиск в интернете, файлы, MCP-серверы и навыки.</p>
         </div>
         <div class="sport-chips" id="sportChips">
           <button class="chip" data-prompt="Разбери предстоящий матч: форма команд, травмы, H2H, вероятности исходов. Начни с поиска свежих данных.">⚽ Футбол</button>
@@ -141,7 +141,7 @@
           <button class="chip" data-prompt="Найди матчи выходных с завышенными коэффициентами: сравни вероятности по статистике с линиями букмекеров.">🎯 Поиск ценности</button>
         </div>
         <div class="cap-strip" id="capStrip">
-          <div class="cap-card notch"><span class="cap-k">Движок</span><span class="cap-v" id="capEngine">Claude Code</span></div>
+          <div class="cap-card notch"><span class="cap-k">Движок</span><span class="cap-v" id="capEngine">СПОРТЧАТ AI</span></div>
           <div class="cap-card notch"><span class="cap-k">MCP</span><span class="cap-v" id="capMcp">0 серверов</span></div>
           <div class="cap-card notch"><span class="cap-k">Навыки</span><span class="cap-v" id="capSkills">1</span></div>
         </div>
@@ -183,6 +183,35 @@
         <span class="uc-session" id="ucSession" hidden></span>
       </div>
     </div>
+
+    <!-- ═══════════ Страница «События» ═══════════ -->
+    <section id="eventsView" class="events-view" hidden>
+      <div class="events-head">
+        <div class="events-cap">
+          <span class="pane-title">Предстоящие события</span>
+          <span class="pane-hint">футбол · sstats.net</span>
+        </div>
+        <div class="events-nav">
+          <div class="ev-filter-wrap">
+            <button id="evLeagueBtn" class="ev-day ev-league-btn" title="Фильтр по лигам">Все лиги ▾</button>
+            <div id="evLeagueMenu" class="ev-menu" hidden>
+              <div class="ev-menu-search">
+                <input type="text" id="evLeagueSearch" placeholder="Поиск лиги или страны…" autocomplete="off">
+              </div>
+              <div class="ev-menu-list" id="evLeagueList"></div>
+            </div>
+          </div>
+          <button class="ev-day" data-date="today">Сегодня</button>
+          <button class="ev-day" data-date="tomorrow">Завтра</button>
+          <input type="date" id="evDate" class="ev-date-input">
+          <button id="evRefresh" class="mini-icon" title="Обновить"><svg><use href="#i-clock"/></svg></button>
+        </div>
+      </div>
+      <div class="events-scroll" id="eventsScroll">
+        <div id="eventsNotice" class="events-notice" hidden></div>
+        <div id="eventsGrid" class="events-grid"></div>
+      </div>
+    </section>
   </main>
 
   <!-- ═══════════ Правый рейл ═══════════ -->
@@ -193,6 +222,9 @@
       <button class="rtab" data-tab="skills">Skills</button>
       <button class="rtab" data-tab="plugins">Плагины</button>
       <button class="rtab" data-tab="cli">Консоль</button>
+      <button id="railClose" class="drawer-x only-mobile" title="Закрыть панель" aria-label="Закрыть панель">
+        <svg><use href="#i-x"/></svg>
+      </button>
     </nav>
     <div class="rail-body">
       <div class="rpane active" data-pane="episodes">
@@ -220,12 +252,12 @@
           <button id="addSkillBtn" class="btn-ghost-sm"><svg><use href="#i-plus"/></svg> Создать</button>
         </div>
         <div id="skillList" class="skill-list"></div>
-        <div class="pane-note">Файлы <code>SKILL.md</code> в <code>workspace/.claude/skills/</code> — Claude подключает их автоматически.</div>
+        <div class="pane-note">Файлы <code>SKILL.md</code> в <code>workspace/.claude/skills/</code> — движок подключает их автоматически.</div>
       </div>
 
       <div class="rpane" data-pane="plugins">
         <div class="pane-head">
-          <span class="pane-title">Плагины Claude Code</span>
+          <span class="pane-title">Плагины</span>
           <button id="refreshPlugins" class="mini-icon" title="Перечитать"><svg><use href="#i-clock"/></svg></button>
         </div>
         <div class="store-bar">
@@ -235,17 +267,17 @@
         <div id="pluginList" class="plugin-list">
           <div class="empty-note">Загружаю каталог…</div>
         </div>
-        <div class="pane-note">Магазин — это настоящие маркетплейсы Claude Code (<code>~/.claude/plugins</code>).
+        <div class="pane-note">Магазин — это настоящие маркетплейсы движка (<code>~/.claude/plugins</code>).
           Установка через <code>claude plugin install</code>, подключение к агенту — переключателем.
           В чате доступно: <code>/plugin</code>, <code>/reload-plugins</code>, <code>/reload-skills</code>.</div>
       </div>
 
       <div class="rpane" data-pane="cli">
         <div class="pane-head">
-          <span class="pane-title">Консоль Claude CLI</span>
+          <span class="pane-title">Консоль CLI</span>
           <span class="pane-hint">неинтерактивные команды</span>
         </div>
-        <div id="cliOut" class="cli-out"><div class="cli-line dim"># вывод claude появится здесь</div></div>
+        <div id="cliOut" class="cli-out"><div class="cli-line dim"># вывод команды появится здесь</div></div>
         <div class="cli-suggest">
           <button class="chip mono-chip" data-cmd="claude --version">claude --version</button>
           <button class="chip mono-chip" data-cmd="claude mcp list">claude mcp list</button>
@@ -262,8 +294,8 @@
 
   <!-- ═══════════ Статусбар ═══════════ -->
   <footer class="statusbar">
-    <span id="sbConn" class="sb-item"><span class="sb-led sb-led-ok"></span> подключено</span>
-    <span class="sb-item sb-grow" id="sbWs"></span>
+        <span id="sbConn" class="sb-item"><span class="sb-led sb-led-ok"></span> подключено</span>
+        <span class="sb-item sb-grow" aria-hidden="true"></span>
     <span class="sb-item" id="sbCounts"></span>
     <span class="sb-item">127.0.0.1:3777</span>
   </footer>

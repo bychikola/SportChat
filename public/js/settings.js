@@ -19,7 +19,7 @@ export function createSettings({ S, updateTablo, updateEngineInfo }) {
         <div class="field">
           <label>Системный промпт — роль и методология аналитика (SYSTEM_PROMPT.md)</label>
           <textarea id="setSystemPrompt" class="editor-tall" spellcheck="false" style="min-height:380px"></textarea>
-          <div class="hint">Добавляется к штатному системному промпту Claude Code при каждом
+          <div class="hint">Добавляется к системному промпту движка при каждом
             сообщении: роль, порядок сбора данных, веса факторов, правила вероятностей и вывода.</div>
         </div>
         <div class="field">
@@ -32,7 +32,7 @@ export function createSettings({ S, updateTablo, updateEngineInfo }) {
         <div class="field">
           <label>workspace/.claude/settings.json</label>
           <textarea id="setSettings" class="editor-tall" spellcheck="false"></textarea>
-          <div class="hint">Формат разрешений Claude Code: <code>permissions.allow / permissions.deny</code>,
+          <div class="hint">Формат разрешений движка: <code>permissions.allow / permissions.deny</code>,
             правила вида <code>"Bash(git *)"</code>, <code>"Write"</code>, <code>"mcp__server__tool"</code>.</div>
         </div>
         <div class="form-error" id="setErr"></div>
@@ -103,7 +103,7 @@ export function createSettings({ S, updateTablo, updateEngineInfo }) {
 
     const modal = openModal({
       title: 'Настройки движка',
-      sub: 'реальный конфиг Claude Code рабочего пространства',
+      sub: 'реальный конфиг движка рабочего пространства',
       wide: true,
       body: wrap,
       foot,
@@ -114,7 +114,7 @@ export function createSettings({ S, updateTablo, updateEngineInfo }) {
     const meta = S.meta || {};
     pane.innerHTML = `
       <div class="engine-info">
-        <div class="info-card"><div class="info-k">Claude Code</div><div class="info-v">${esc(S.init?.version || '…')}</div></div>
+        <div class="info-card"><div class="info-k">Версия движка</div><div class="info-v">${esc(S.init?.version || '…')}</div></div>
         <div class="info-card"><div class="info-k">Agent SDK</div><div class="info-v">${esc(meta.sdkVersion || '…')}</div></div>
         <div class="info-card"><div class="info-k">Модель сессии</div><div class="info-v">${esc(S.init?.model || 'определится при старте')}</div></div>
         <div class="info-card"><div class="info-k">Workspace</div><div class="info-v">${esc(meta.workspace || '')}</div></div>

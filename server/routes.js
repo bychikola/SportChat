@@ -11,8 +11,11 @@ import {
   readInstalledPlugins, readUserEnabledPlugins, readPluginSelection,
   writePluginSelection, readPluginStore,
 } from './store.js';
+import sstatsRouter from './sstats.js';
 
 const router = express.Router();
+
+router.use('/sstats', sstatsRouter);
 
 /* ---------- meta & sessions ---------- */
 

@@ -66,7 +66,7 @@ wss.on('connection', (ws) => {
 server.listen(PORT, HOST, () => {
   const shown = HOST === '0.0.0.0' ? '127.0.0.1' : HOST;
   console.log('');
-  console.log('  ⚡ SportChat — аналитика на реальном Claude Code');
+  console.log('  ⚡ SportChat AI — аналитика спортивных событий');
   console.log(`  ▸ Интерфейс:  http://${shown}:${PORT}`);
   console.log(`  ▸ Workspace:  ${path.join(ROOT, 'workspace')}`);
   console.log('');

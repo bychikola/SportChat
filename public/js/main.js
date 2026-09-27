@@ -5,6 +5,7 @@ import { api, connectWs } from './api.js';
 import { createChat } from './chat.js';
 import { createRail } from './rail.js';
 import { createSettings } from './settings.js';
+import { createEvents } from './events.js';
 
 /* ── состояние ── */
 const S = {
@@ -54,9 +55,7 @@ function plural(n, one, few, many) {
 }
 
 function updateEngineInfo() {
-  const v = S.init?.version ? `v${S.init.version}` : '';
-  $('#ccVersion').textContent = v;
-  $('#capEngine').textContent = `Claude Code${S.init?.version ? ` ${S.init.version}` : ''}`;
+  $('#capEngine').textContent = `СПОРТЧАТ AI${S.init?.version ? ` · ${S.init.version}` : ''}`;
   const n = S.mcpServers.length;
   $('#capMcp').textContent = n === 0 ? 'нет серверов' : `${n} ${plural(n, 'сервер', 'сервера', 'серверов')}`;
   $('#capSkills').textContent = String(S.skills.length);
@@ -124,6 +123,8 @@ chat.bindSessionStarted((init) => {
   loadSessions();
 });
 
+const eventsView = createEvents({ chat });
+
 function shortModel(m) {
   if (!m || m === 'default') return 'по умолчанию';
   return String(m).replace(/-\d{8}$/g, '');
@@ -131,7 +132,7 @@ function shortModel(m) {
 
 /* ══════════ слэш-команды ══════════ */
 const SLASH_COMMANDS = [
-  { cmd: '/plugin', desc: 'магазин плагинов Claude Code', run: () => rail.switchTab('plugins') },
+  { cmd: '/plugin', desc: 'магазин плагинов', run: () => rail.switchTab('plugins') },
   { cmd: '/reload-plugins', desc: 'перечитать плагины', run: async () => {
     await rail.loadPlugins();
     toast('Плагины перечитаны — применятся к следующему сообщению', 'ok');
@@ -150,7 +151,7 @@ const SLASH_COMMANDS = [
   { cmd: '/help', desc: 'список команд', run: () => {
     chat.note(`<b style="color:var(--flut)">Команды SportChat</b><br>${
       SLASH_COMMANDS.map((c) => `<span style="font-family:var(--f-mono);color:var(--flut)">${c.cmd}</span> — ${c.desc}`).join('<br>')
-    }<br><br>Команды плагинов (например <span style="font-family:var(--f-mono)">/remember</span>) отправляй как обычное сообщение — их исполняет Claude Code.`);
+    }<br><br>Команды плагинов (например <span style="font-family:var(--f-mono)">/remember</span>) отправляй как обычное сообщение — их исполняет движок.`);
   } },
 ];
 
@@ -385,7 +386,7 @@ function openCustomProviderModal() {
   "apiKey": "",
   "models": ["model-id-1", "model-id-2"]
 }</textarea>
-      <div class="hint">Anthropic-совместимый шлюз: <code>baseURL</code> — корень API (Claude Code добавит /v1/messages).
+      <div class="hint">Anthropic-совместимый шлюз: <code>baseURL</code> — корень API (движок добавит /v1/messages).
       Поля <code>models</code> необязательно — если пусто, сервер попробует <code>GET baseURL/v1/models</code>.
       Примеры baseURL: OpenRouter <code>https://openrouter.ai/api</code>, DeepSeek <code>https://api.deepseek.com/anthropic</code>.</div>
     </div>
@@ -568,6 +569,12 @@ $$('.tbtn[data-open]').forEach((btn) => {
 });
 $('#railToggle').addEventListener('click', () => document.body.classList.toggle('rail-open'));
 $('#sideToggle').addEventListener('click', () => document.body.classList.toggle('side-open'));
+// явные кнопки закрытия выдвижных панелей (мобильные)
+$('#sideClose')?.addEventListener('click', () => document.body.classList.remove('side-open'));
+$('#railClose')?.addEventListener('click', () => document.body.classList.remove('rail-open'));
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') document.body.classList.remove('side-open', 'rail-open');
+});
 
 // тап по подложке закрывает выдвижные панели (мобильные)
 $('#drawerBackdrop').addEventListener('click', () => {
@@ -584,9 +591,6 @@ $('.brand').addEventListener('click', () => {
 (async function boot() {
   try {
     S.meta = await api('/meta');
-    $('#wsPath').textContent = `…\\${S.meta.workspace.split('\\').slice(-2).join('\\')}`;
-    $('#wsPath').title = S.meta.workspace;
-    $('#sbWs').textContent = S.meta.workspace;
   } catch { /* ignore */ }
 
   await Promise.all([rail.loadMcp(), rail.loadSkills(), rail.loadPlugins()]);
