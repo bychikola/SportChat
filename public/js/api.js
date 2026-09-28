@@ -1,9 +1,16 @@
 /* REST + WebSocket транспорт */
 
+export function authToken() {
+  return localStorage.getItem('sc_authToken') || '';
+}
+
 export async function api(path, { method = 'GET', body } = {}) {
+  const headers = body !== undefined ? { 'Content-Type': 'application/json' } : {};
+  const token = authToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(`/api${path}`, {
     method,
-    headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+    headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   let data = {};

@@ -6,6 +6,7 @@ import { createChat } from './chat.js';
 import { createRail } from './rail.js';
 import { createSettings } from './settings.js';
 import { createEvents } from './events.js';
+import { createProfile } from './profile.js';
 
 /* ── состояние ── */
 const S = {
@@ -124,6 +125,7 @@ chat.bindSessionStarted((init) => {
 });
 
 const eventsView = createEvents({ chat });
+createProfile();
 
 function shortModel(m) {
   if (!m || m === 'default') return 'по умолчанию';

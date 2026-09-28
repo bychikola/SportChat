@@ -13,11 +13,13 @@ import {
 } from './store.js';
 import sstatsRouter from './sstats.js';
 import signalsRouter from './signals.js';
+import authRouter from './auth.js';
 
 const router = express.Router();
 
 router.use('/sstats', sstatsRouter);
 router.use('/signals', signalsRouter);
+router.use('/auth', authRouter);
 
 /* ---------- meta & sessions ---------- */
 

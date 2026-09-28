@@ -232,6 +232,36 @@ body.rail-hidden .rail { overflow: hidden; border-left: none; }
 .model-menu input { flex: 1; }
 
 .tablo-actions { display: flex; align-items: center; gap: 4px; }
+
+/* кнопка профиля в табло */
+.profile-ava {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 50%;
+  font-family: var(--f-mono); font-weight: 700; font-size: 12px;
+  color: var(--ink-on-flut);
+}
+.profile-ava-empty { background: var(--pitch-2); color: var(--faint); box-shadow: inset 0 0 0 1px var(--line-strong); }
+.profile-btn { min-width: 40px; }
+
+/* карточка профиля в модалке */
+.profile-card {
+  display: flex; align-items: center; gap: 12px;
+  background: linear-gradient(170deg, rgba(255, 180, 84, .07), transparent 45%), var(--pitch-1);
+  box-shadow: inset 0 0 0 1px rgba(255, 180, 84, .28);
+  border-radius: 12px; padding: 13px 15px;
+}
+.profile-ava-big {
+  width: 52px; height: 52px; border-radius: 12px; font-size: 22px; flex: none;
+  box-shadow: 0 0 18px -6px rgba(255, 180, 84, .6);
+}
+.profile-id { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.profile-id b { font-size: 16px; color: var(--chalk); }
+.profile-stats {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+  margin: 4px 0 8px;
+}
+.auth-switch { display: flex; gap: 8px; }
+.auth-tabs { display: flex; gap: 9px; justify-content: flex-end; }
 .tbtn {
   display: flex; align-items: center; gap: 7px;
   background: none; border: 1px solid transparent; border-radius: 9px;
