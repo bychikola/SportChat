@@ -337,7 +337,7 @@ function topTier(g) {
   const L = g.season?.league;
   if (!L?.name) return 0;
   // женские и молодёжные турниры не считаем топовыми
-  if (/women|femenil|feminino|femminile|u23|u21|u19|youth/i.test(L.name)) return 0;
+  if (/women|femeni|femini|femminile|u23|u21|u19|youth/i.test(L.name)) return 0;
   for (const r of TOP_RULES) {
     if (r.re.test(L.name) && (!r.country || r.country.test(L.country?.name || ''))) return r.t || 2;
   }
@@ -405,6 +405,8 @@ export function createEvents({ chat }) {
   let lastGames = [];      // предстоящие матчи выбранной даты
   let liveGames = [];      // идущие сейчас
   let doneGames = [];      // завершённые выбранной даты
+  let yestGames = [];      // завершённые вчера (для инсайтов)
+  let yestExpanded = false;
   let leagueFilter = null; // ключ лиги (id) или null = все
   let groupFilter = 'soon';// 'live' | 'soon' | 'done'
   let autoTimer = null;
@@ -452,10 +454,11 @@ export function createEvents({ chat }) {
     grid.replaceChildren();
     const date = dateStr(dayOffset);
     const r = refresh ? '&refresh=1' : '';
-    const [up, lv, fin] = await Promise.allSettled([
+    const [up, lv, fin, yest] = await Promise.allSettled([
       api(`/sstats/upcoming?date=${date}&limit=1000&tz=${TZ}${r}`),
       api(`/sstats/live?tz=${TZ}${r}`),
       api(`/sstats/finished?date=${date}&tz=${TZ}${r}`),
+      api(`/sstats/finished?date=${dateStr(-1)}&tz=${TZ}${r}`),
     ]);
     const take = (p) => (p.status === 'fulfilled' && p.value?.status === 'OK' && Array.isArray(p.value.data)) ? p.value.data : null;
     const errs = [up, lv, fin].filter((p) => p.status === 'rejected').map((p) => p.reason?.message);
@@ -464,12 +467,80 @@ export function createEvents({ chat }) {
       return;
     }
     if (errs.length) toast(`Часть данных не загрузилась: ${errs[0]}`, 'warn', 4000);
-    const upD = take(up), lvD = take(lv), finD = take(fin);
+    const upD = take(up), lvD = take(lv), finD = take(fin), yD = take(yest);
     if (upD) lastGames = upD;
     if (lvD) liveGames = lvD;
     if (finD) doneGames = finD;
+    if (yD) yestGames = yD;
     updateLeagueBtn();
     render();
+    renderInsights();
+  }
+
+  /* ---------- инсайты: лига дня + итоги вчера ---------- */
+  function renderInsights() {
+    const dayEl = $('#evLeagueDay');
+    const yestEl = $('#evYest');
+
+    // лига дня: группируем вчерашние завершённые матчи по лигам
+    const byLeague = new Map();
+    for (const g of yestGames) {
+      if (g.homeResult == null || g.awayResult == null) continue;
+      const L = g.season?.league;
+      // женские и молодёжные лиги — слишком шумная выборка для «лиги дня»
+      if (/women|femeni|femini|femminile|u23|u21|u19|youth/i.test(L?.name || '')) continue;
+      const key = leagueKeyOf(g);
+      const cur = byLeague.get(key) || {
+        key,
+        name: leagueRuName(L) || L?.name || '—',
+        country: countryRu(L?.country?.name),
+        count: 0, goals: 0, over25: 0,
+      };
+      cur.count++;
+      cur.goals += (g.homeResult + g.awayResult);
+      if (g.homeResult + g.awayResult > 2.5) cur.over25++;
+      byLeague.set(key, cur);
+    }
+    const best = [...byLeague.values()]
+      .filter((l) => l.count >= 3)
+      .map((l) => ({ ...l, avg: l.goals / l.count, overPct: Math.round(l.over25 / l.count * 100) }))
+      .sort((a, b) => b.avg - a.avg)[0];
+
+    dayEl.innerHTML = best ? `
+      <div class="evi-cap">Лучшая лига дня · вчера</div>
+      <div class="evi-league">${esc(best.name)}<span class="evi-country">✦ ${esc(best.country)}</span></div>
+      <div class="evi-stats">
+        <span><b>${best.count}</b> ${best.count === 1 ? 'матч' : best.count < 5 ? 'матча' : 'матчей'}</span>
+        <span>ср. тотал <b>${best.avg.toFixed(2)}</b></span>
+        <span>верх 2.5 — <b>${best.overPct}%</b></span>
+      </div>` : `
+      <div class="evi-cap">Лучшая лига дня · вчера</div>
+      <div class="evi-empty">Данных пока мало</div>`;
+
+    // итоги вчера: сначала матчи топ-лиг, при пустоте — любые
+    const topYest = yestGames.filter((g) => topTier(g) > 0);
+    const pool = topYest.length ? topYest : yestGames;
+    const list = (yestExpanded ? pool : pool.slice(0, 6));
+    const rows = list.map((g) => {
+      const hr = g.homeResult, ar = g.awayResult;
+      const homeBold = hr != null && ar != null && hr > ar;
+      const awayBold = hr != null && ar != null && ar > hr;
+      const lg = leagueRuName(g.season?.league) || g.season?.league?.name || '';
+      return `<div class="evi-row">
+        <span class="evi-lg">${esc(lg)}</span>
+        <span class="evi-t">${homeBold ? `<strong>${esc(teamRu(g.homeTeam?.name))}</strong>` : esc(teamRu(g.homeTeam?.name))} — ${awayBold ? `<strong>${esc(teamRu(g.awayTeam?.name))}</strong>` : esc(teamRu(g.awayTeam?.name))}</span>
+        <span class="evi-sc">${hr != null ? `${hr}:${ar}` : '—'}</span>
+      </div>`;
+    }).join('');
+    const cap = `Итоги вчера · ${fmtDateHuman(-1)}`;
+    yestEl.innerHTML = `
+      <div class="evi-cap">${cap}${topYest.length ? ' · топ-лиги' : ''}</div>
+      ${rows || '<div class="evi-empty">Нет данных</div>'}
+      ${pool.length > 6 ? `<button class="evi-more" id="eviMore">${yestExpanded ? 'свернуть ↑' : `все матчи → (${pool.length})`}</button>` : ''}`;
+    yestEl.querySelector('#eviMore')?.addEventListener('click', () => {
+      yestExpanded = !yestExpanded;
+      renderInsights();
+    });
   }
 
   // на насыщенный день матчей сотни — рисуем топы и первые N, остальное через фильтр лиг
