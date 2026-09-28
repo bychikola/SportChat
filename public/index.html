@@ -212,6 +212,16 @@
         <div class="ev-insights">
           <div class="ev-insight notch" id="evLeagueDay"></div>
           <div class="ev-insight notch" id="evYest"></div>
+          <div class="ev-insight notch ev-fav" id="evFav">
+            <div class="evi-cap">★ Избранное — подсветится в списке</div>
+            <input id="favTeamInput" list="favTeamList" class="ev-fav-input" autocomplete="off" placeholder="Любимая команда — начни вводить…">
+            <datalist id="favTeamList"></datalist>
+            <select id="favLeagueSel" class="ev-fav-select"></select>
+            <div class="evi-actions">
+              <button class="evi-chip" id="favOnlyBtn" title="Показывать только избранные матчи">Только избранное</button>
+              <button class="evi-chip" id="favClear" title="Убрать избранное">Сбросить</button>
+            </div>
+          </div>
         </div>
         <div class="ev-tiles" id="evTiles">
           <button class="ev-tile" data-group="live"><b>0</b><span>В эфире</span></button>

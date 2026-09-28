@@ -926,6 +926,31 @@ body.events-open .composer-wrap { display: none; }
 }
 .evi-more:hover { text-decoration: underline; }
 
+/* карточка избранного */
+.ev-fav .ev-fav-input, .ev-fav .ev-fav-select {
+  width: 100%; margin-top: 7px;
+  background: #0c1310; border: 1px solid var(--line-strong); border-radius: 8px;
+  color: var(--chalk); font-size: 12.5px; padding: 8px 11px; outline: none;
+  color-scheme: dark;
+}
+.ev-fav .ev-fav-input:focus, .ev-fav .ev-fav-select:focus { border-color: var(--flut); }
+.evi-actions { display: flex; gap: 8px; margin-top: 9px; }
+.evi-chip {
+  background: none; border: 1px solid var(--line-strong); border-radius: 999px;
+  color: var(--dim); font-size: 11px; padding: 4px 11px; cursor: pointer;
+  transition: color .14s ease, border-color .14s ease, background .14s ease;
+}
+.evi-chip:hover { color: var(--flut); border-color: rgba(255, 180, 84, .5); }
+.evi-chip.active { color: var(--flut); border-color: rgba(255, 180, 84, .5); background: var(--flut-dim); }
+.ev-star {
+  color: var(--mint); font-size: 11px; flex: none;
+  text-shadow: 0 0 8px rgba(70, 211, 154, .6);
+}
+.event-card.is-fav {
+  box-shadow: inset 0 0 0 1px rgba(70, 211, 154, .5),
+    0 0 18px -8px rgba(70, 211, 154, .55);
+}
+
 /* плитки статусов: в эфире / скоро / завершено */
 .ev-tiles {
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;

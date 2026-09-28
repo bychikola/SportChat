@@ -412,6 +412,30 @@ export function createEvents({ chat }) {
   let autoTimer = null;
   let accStats = null; // статистика сигналов из /api/signals
 
+  /* избранное: команда и лига (Фаза A плана профилей) */
+  const fromLS = (k) => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch { return null; } };
+  let favTeam = fromLS('sc_favTeam');      // {id, name}
+  let favLeague = fromLS('sc_favLeague');  // {key, name}
+  let favOnly = localStorage.getItem('sc_favOnly') === '1';
+
+  function isFavGame(g) {
+    if (favTeam && (g.homeTeam?.id === favTeam.id || g.awayTeam?.id === favTeam.id)) return true;
+    if (favLeague && leagueKeyOf(g) === favLeague.key) return true;
+    return false;
+  }
+
+  /** Сортировка группы: избранное → элита → топовые → обычные, внутри по времени. */
+  function sortWithFav(games) {
+    return [...games].sort((a, b) => {
+      const fa = isFavGame(a) ? 0 : 1, fb = isFavGame(b) ? 0 : 1;
+      if (fa !== fb) return fa - fb;
+      const ta = topTier(a), tb = topTier(b);
+      const ra = ta === 1 ? 0 : ta === 2 ? 1 : 2, rb = tb === 1 ? 0 : tb === 2 ? 1 : 2;
+      if (ra !== rb) return ra - rb;
+      return new Date(a.date) - new Date(b.date);
+    });
+  }
+
   function isOpen() {
     return document.body.classList.contains('events-open');
   }
@@ -478,6 +502,7 @@ export function createEvents({ chat }) {
     updateLeagueBtn();
     render();
     renderInsights();
+    renderFavCard();
   }
 
 
@@ -589,10 +614,11 @@ export function createEvents({ chat }) {
 
   function render() {
     const leagueMatch = (g) => leagueFilter == null || leagueKeyOf(g) === leagueFilter;
+    const favMatch = (g) => !favOnly || isFavGame(g);
     const groups = {
-      live: sortGames(liveGames.filter(leagueMatch)),
-      soon: sortGames(lastGames.filter(leagueMatch)),
-      done: sortGames(doneGames.filter(leagueMatch)),
+      live: sortWithFav(liveGames.filter(leagueMatch).filter(favMatch)),
+      soon: sortWithFav(lastGames.filter(leagueMatch).filter(favMatch)),
+      done: sortWithFav(doneGames.filter(leagueMatch).filter(favMatch)),
     };
     // плитки-счётчики + точность
     for (const b of document.querySelectorAll('.ev-tile')) {
@@ -705,8 +731,9 @@ export function createEvents({ chat }) {
 
   function renderCard(g, group) {
     const top = isTopGame(g);
+    const fav = isFavGame(g);
     const el = document.createElement('article');
-    el.className = `event-card notch${top ? ' is-top' : ''}${group === 'done' ? ' is-done' : ''}`;
+    el.className = `event-card notch${top ? ' is-top' : ''}${group === 'done' ? ' is-done' : ''}${fav ? ' is-fav' : ''}`;
     const L = g.season?.league;
     const league = [leagueRuName(L), roundRu(g.roundName)].filter(Boolean).join(' · ');
     const o1x2 = odds1x2(g);
@@ -716,7 +743,7 @@ export function createEvents({ chat }) {
     // шапка карточки зависит от группы
     const score = (g.homeResult != null || g.awayResult != null)
       ? `${g.homeResult ?? 0}:${g.awayResult ?? 0}` : null;
-    let headLeft = top ? '<span class="ev-top">топ</span>' : '';
+    let headLeft = `${fav ? '<span class="ev-star">★</span>' : ''}${top ? '<span class="ev-top">топ</span>' : ''}`;
     let headRight;
     if (group === 'live') {
       const liveLabel = g.status === 4 ? 'ПЕРЕРЫВ' : (g.elapsed != null ? `LIVE ${g.elapsed}′` : 'LIVE');
@@ -868,6 +895,82 @@ export function createEvents({ chat }) {
     load();
   });
   $('#evRefresh').addEventListener('click', () => load(true));
+
+
+  /* ---------- избранное: команда и лига (Фаза A) ---------- */
+  const favTeamInput = $('#favTeamInput');
+  const favLeagueSel = $('#favLeagueSel');
+
+  function renderFavCard() {
+    // подсказки команд — уникальные команды из загруженных матчей
+    const teams = new Map();
+    for (const g of allGames()) {
+      for (const t of [g.homeTeam, g.awayTeam]) {
+        if (t?.name && t.id != null && !teams.has(t.name)) teams.set(t.name, t.id);
+      }
+    }
+    $('#favTeamList').innerHTML = [...teams.keys()].sort()
+      .map((n) => `<option value="${esc(n)}"></option>`).join('');
+    favLeagueSel.innerHTML = '<option value="">Любимая лига — не выбрана</option>' +
+      buildLeagues().map((l) => `<option value="${esc(String(l.key))}">${esc(l.name)}${l.country ? ' — ' + esc(l.country) : ''}</option>`).join('');
+    favTeamInput.value = favTeam?.name || '';
+    favLeagueSel.value = favLeague ? String(favLeague.key) : '';
+    $('#favOnlyBtn').classList.toggle('active', favOnly);
+  }
+
+  favTeamInput.addEventListener('change', () => {
+    const name = favTeamInput.value.trim();
+    if (!name) { favTeam = null; localStorage.removeItem('sc_favTeam'); render(); return; }
+    // точное совпадение с командой из загруженных матчей
+    for (const g of allGames()) {
+      for (const t of [g.homeTeam, g.awayTeam]) {
+        if (t?.name === name && t.id != null) {
+          favTeam = { id: t.id, name };
+          localStorage.setItem('sc_favTeam', JSON.stringify(favTeam));
+          toast(`Избранная команда: ${name}`, 'ok', 2400);
+          render();
+          return;
+        }
+      }
+    }
+    toast('Команда не найдена в текущих матчах — выбери из подсказок', 'warn', 3200);
+    favTeamInput.value = favTeam?.name || '';
+  });
+
+  favLeagueSel.addEventListener('change', () => {
+    const v = favLeagueSel.value;
+    if (!v) {
+      favLeague = null;
+      localStorage.removeItem('sc_favLeague');
+      render();
+      return;
+    }
+    const l = buildLeagues().find((x) => String(x.key) === v);
+    if (!l) return;
+    favLeague = { key: l.key, name: l.name };
+    localStorage.setItem('sc_favLeague', JSON.stringify(favLeague));
+    toast(`Избранная лига: ${l.name}`, 'ok', 2400);
+    render();
+  });
+
+  $('#favOnlyBtn').addEventListener('click', () => {
+    favOnly = !favOnly;
+    localStorage.setItem('sc_favOnly', favOnly ? '1' : '0');
+    renderFavCard();
+    render();
+  });
+
+  $('#favClear').addEventListener('click', () => {
+    favTeam = null;
+    favLeague = null;
+    favOnly = false;
+    localStorage.removeItem('sc_favTeam');
+    localStorage.removeItem('sc_favLeague');
+    localStorage.removeItem('sc_favOnly');
+    renderFavCard();
+    render();
+    toast('Избранное сброшено', 'ok', 2000);
+  });
 
   /* ---------- плитки статусов: переключение групп ---------- */
   document.querySelectorAll('.ev-tile').forEach((b) => {
