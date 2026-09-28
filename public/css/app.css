@@ -1147,7 +1147,7 @@ body.events-open .composer-wrap { display: none; }
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .field label { font-family: var(--f-mono); font-size: 9.5px; letter-spacing: .2em; text-transform: uppercase; color: var(--dim); }
-.field input[type="text"], .field select, .field textarea {
+.field input[type="text"], .field input[type="password"], .field input[type="email"], .field input[type="tel"], .field select, .field textarea {
   background: #0c1310; border: 1px solid var(--line-strong); border-radius: 9px;
   color: var(--chalk); font-size: 13.5px; padding: 9.5px 12px; outline: none;
   transition: border-color .15s;
@@ -1422,7 +1422,7 @@ body { -webkit-tap-highlight-color: transparent; }
   /* 16px у полей ввода — iOS зумит фокусом всё, что меньше */
   .composer textarea,
   .uc-select,
-  .field input[type="text"], .field select, .field textarea,
+  .field input[type="text"], .field input[type="password"], .field input[type="email"], .field input[type="tel"], .field select, .field textarea,
   .mm-searchrow input, .mm-keyrow input, .model-menu input,
   .store-bar input, .cli-form input { font-size: 16px; }
 
