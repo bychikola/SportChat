@@ -357,8 +357,12 @@ export function createEvents({ chat }) {
   const leagueSearch = $('#evLeagueSearch');
 
   let dayOffset = 0;       // 0 = сегодня
-  let lastGames = [];
+  let lastGames = [];      // предстоящие матчи выбранной даты
+  let liveGames = [];      // идущие сейчас
+  let doneGames = [];      // завершённые выбранной даты
   let leagueFilter = null; // ключ лиги (id) или null = все
+  let groupFilter = 'soon';// 'live' | 'soon' | 'done'
+  let autoTimer = null;
 
   function isOpen() {
     return document.body.classList.contains('events-open');
@@ -368,7 +372,11 @@ export function createEvents({ chat }) {
     document.body.classList.add('events-open');
     view.hidden = false;
     toggleBtn.classList.add('is-open');
-    if (!grid.children.length && !notice.textContent) load();
+    load();
+    // авто-обновление, пока вкладка открыта (live у sstats обновляется каждую минуту)
+    if (!autoTimer) {
+      autoTimer = setInterval(() => { if (isOpen()) load(); }, 75_000);
+    }
   }
 
   function close() {
@@ -397,39 +405,57 @@ export function createEvents({ chat }) {
   async function load(refresh = false) {
     setNotice('Загружаю матчи…', 'info');
     grid.replaceChildren();
-    try {
-      const q = new URLSearchParams({ date: dateStr(dayOffset), limit: '1000', tz: String(TZ) });
-      if (refresh) q.set('refresh', '1');
-      const j = await api(`/sstats/upcoming?${q}`);
-      if (j.status !== 'OK' || !Array.isArray(j.data)) {
-        throw new Error(j.message || 'SStats вернул неожиданный ответ');
-      }
-      lastGames = j.data;
-      updateLeagueBtn();
-      render();
-    } catch (e) {
-      setNotice(`Не удалось загрузить матчи: ${e.message}`, 'error');
+    const date = dateStr(dayOffset);
+    const r = refresh ? '&refresh=1' : '';
+    const [up, lv, fin] = await Promise.allSettled([
+      api(`/sstats/upcoming?date=${date}&limit=1000&tz=${TZ}${r}`),
+      api(`/sstats/live?tz=${TZ}${r}`),
+      api(`/sstats/finished?date=${date}&tz=${TZ}${r}`),
+    ]);
+    const take = (p) => (p.status === 'fulfilled' && p.value?.status === 'OK' && Array.isArray(p.value.data)) ? p.value.data : null;
+    const errs = [up, lv, fin].filter((p) => p.status === 'rejected').map((p) => p.reason?.message);
+    if (errs.length === 3) {
+      setNotice(`Не удалось загрузить матчи: ${errs[0] || 'нет данных от SStats'}`, 'error');
+      return;
     }
+    if (errs.length) toast(`Часть данных не загрузилась: ${errs[0]}`, 'warn', 4000);
+    const upD = take(up), lvD = take(lv), finD = take(fin);
+    if (upD) lastGames = upD;
+    if (lvD) liveGames = lvD;
+    if (finD) doneGames = finD;
+    updateLeagueBtn();
+    render();
   }
 
   // на насыщенный день матчей сотни — рисуем топы и первые N, остальное через фильтр лиг
   const MAX_CARDS = 300;
 
   function render() {
-    const games = leagueFilter == null
-      ? lastGames
-      : lastGames.filter((g) => leagueKeyOf(g) === leagueFilter);
-    const sorted = sortGames(games);
-    const shown = sorted.slice(0, MAX_CARDS);
+    const leagueMatch = (g) => leagueFilter == null || leagueKeyOf(g) === leagueFilter;
+    const groups = {
+      live: sortGames(liveGames.filter(leagueMatch)),
+      soon: sortGames(lastGames.filter(leagueMatch)),
+      done: sortGames(doneGames.filter(leagueMatch)),
+    };
+    // плитки-счётчики
+    for (const b of document.querySelectorAll('.ev-tile')) {
+      const n = groups[b.dataset.group]?.length ?? 0;
+      b.querySelector('b').textContent = String(n);
+      b.classList.toggle('active', b.dataset.group === groupFilter);
+    }
+    const list = groups[groupFilter] ?? groups.soon;
+    const shown = list.slice(0, MAX_CARDS);
     const frag = document.createDocumentFragment();
     for (const g of shown) {
-      frag.appendChild(renderCard(g));
+      frag.appendChild(renderCard(g, groupFilter));
     }
     grid.replaceChildren(frag);
-    if (!lastGames.length) {
-      setNotice(`Нет предстоящих матчей на ${fmtDateHuman(dayOffset)}`, 'info');
-    } else if (shown.length < sorted.length) {
-      setNotice(`Показаны первые ${shown.length} из ${sorted.length} матчей — сузь выбор фильтром лиг или датой`, 'info');
+    if (!liveGames.length && !lastGames.length && !doneGames.length) {
+      setNotice(`Нет матчей на ${fmtDateHuman(dayOffset)}`, 'info');
+    } else if (!shown.length) {
+      setNotice('В этой группе матчей нет — переключи плитку выше или фильтр лиг', 'info');
+    } else if (shown.length < list.length) {
+      setNotice(`Показаны первые ${shown.length} из ${list.length} матчей — сузь выбор фильтром лиг или датой`, 'info');
     } else {
       setNotice('');
     }
@@ -441,9 +467,11 @@ export function createEvents({ chat }) {
     return L ? (L.id ?? L.name) : '__noleague__';
   }
 
+  const allGames = () => [...liveGames, ...lastGames, ...doneGames];
+
   function buildLeagues() {
     const map = new Map();
-    for (const g of lastGames) {
+    for (const g of allGames()) {
       const L = g.season?.league;
       const key = leagueKeyOf(g);
       const cur = map.get(key) || {
@@ -514,24 +542,43 @@ export function createEvents({ chat }) {
     return !leagueMenu.hidden;
   }
 
-  function renderCard(g) {
+  function renderCard(g, group) {
     const top = isTopGame(g);
     const el = document.createElement('article');
-    el.className = `event-card notch${top ? ' is-top' : ''}`;
+    el.className = `event-card notch${top ? ' is-top' : ''}${group === 'done' ? ' is-done' : ''}`;
     const L = g.season?.league;
     const league = [leagueRuName(L), roundRu(g.roundName)].filter(Boolean).join(' · ');
     const o1x2 = odds1x2(g);
     const total = oddsTotal(g);
     const cc = g.homeTeam?.country?.code || '';
 
+    // шапка карточки зависит от группы
+    const score = (g.homeResult != null || g.awayResult != null)
+      ? `${g.homeResult ?? 0}:${g.awayResult ?? 0}` : null;
+    let headLeft = top ? '<span class="ev-top">топ</span>' : '';
+    let headRight;
+    if (group === 'live') {
+      const liveLabel = g.status === 4 ? 'ПЕРЕРЫВ' : (g.elapsed != null ? `LIVE ${g.elapsed}′` : 'LIVE');
+      headLeft = `<span class="ev-badge-live">${liveLabel}</span>` + headLeft;
+      headRight = score
+        ? `<span class="ev-score">${score}</span>`
+        : `<span class="ev-time">${fmtTime(g.date)}</span>`;
+    } else if (group === 'done') {
+      headRight = score
+        ? `<span class="ev-score"><span class="ev-fin-label">ИТОГ</span>${score}</span>`
+        : `<span class="ev-time">${fmtTime(g.date)}</span>`;
+    } else {
+      headRight = `<span class="ev-time">${fmtTime(g.date)}</span>`;
+    }
+
     const odd = (label, value) => (value
       ? `<span class="ev-odd"><i>${esc(label)}</i><b>${esc(String(value))}</b></span>` : '');
 
     el.innerHTML = `
       <div class="ev-head">
-        ${top ? '<span class="ev-top">топ</span>' : ''}
+        ${headLeft}
         <span class="ev-league" title="${esc(league)}">${esc(league || 'Футбол')}</span>
-        <span class="ev-time">${fmtTime(g.date)}</span>
+        ${headRight}
       </div>
       <div class="ev-teams">
         <div class="ev-team">
@@ -632,6 +679,14 @@ export function createEvents({ chat }) {
     load();
   });
   $('#evRefresh').addEventListener('click', () => load(true));
+
+  /* ---------- плитки статусов: переключение групп ---------- */
+  document.querySelectorAll('.ev-tile').forEach((b) => {
+    b.addEventListener('click', () => {
+      groupFilter = b.dataset.group;
+      render();
+    });
+  });
 
   /* ---------- фильтр лиг: события UI ---------- */
   leagueBtn.addEventListener('click', (e) => {

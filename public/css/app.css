@@ -876,6 +876,50 @@ body.events-open .composer-wrap { display: none; }
 .ev-menu-empty { color: var(--faint); font-size: 12px; text-align: center; padding: 12px; }
 
 .events-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 20px 24px; }
+
+/* плитки статусов: в эфире / скоро / завершено */
+.ev-tiles {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+  max-width: 1240px; margin: 0 auto 14px;
+}
+.ev-tile {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  background: var(--pitch-1); box-shadow: inset 0 0 0 1px var(--line);
+  border: none; border-radius: 10px; padding: 10px 8px; color: var(--dim);
+  transition: color .14s ease, box-shadow .14s ease, background .14s ease;
+}
+.ev-tile b {
+  font-family: var(--f-mono); font-size: 18px; font-weight: 700;
+  color: var(--chalk); font-variant-numeric: tabular-nums;
+}
+.ev-tile span {
+  font-family: var(--f-mono); font-size: 9px; letter-spacing: .12em; text-transform: uppercase;
+}
+.ev-tile:hover { color: var(--dim); box-shadow: inset 0 0 0 1px rgba(255, 180, 84, .35); }
+.ev-tile.active { color: var(--flut); background: var(--flut-dim); box-shadow: inset 0 0 0 1px rgba(255, 180, 84, .5); }
+.ev-tile.active b { color: var(--flut); }
+.ev-tile[data-group="live"].active { color: var(--live); background: rgba(255, 90, 90, .07); box-shadow: inset 0 0 0 1px rgba(255, 90, 90, .45); }
+.ev-tile[data-group="live"].active b { color: var(--live); }
+
+/* живая карточка: LIVE-бейдж и счёт */
+.ev-badge-live {
+  flex: none; display: inline-flex; align-items: center; gap: 4px;
+  font-family: var(--f-mono); font-size: 8.5px; font-weight: 700; letter-spacing: .12em;
+  color: var(--live); border: 1px solid rgba(255, 90, 90, .4); border-radius: 999px;
+  padding: 2.5px 8px;
+}
+.ev-badge-live::before {
+  content: ''; width: 5px; height: 5px; border-radius: 50%;
+  background: var(--live); box-shadow: 0 0 6px rgba(255, 90, 90, .8);
+  animation: pulse .8s ease-in-out infinite;
+}
+.ev-score {
+  font-family: var(--f-mono); font-size: 15px; font-weight: 700; color: var(--flut);
+  flex: none; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.ev-score .ev-fin-label { font-size: 8.5px; letter-spacing: .14em; color: var(--faint); margin-right: 6px; font-weight: 400; }
+.event-card.is-done .ev-name { color: var(--dim); }
+.event-card.is-done .ev-league { color: var(--faint); }
 .events-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 12px; max-width: 1240px; margin: 0 auto;
@@ -901,6 +945,7 @@ body.events-open .composer-wrap { display: none; }
   animation: msg-in .28s cubic-bezier(.2, .7, .3, 1);
 }
 .ev-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ev-head .ev-league { flex: 1 1 auto; min-width: 0; }
 /* карточка топ-матча: янтарная рамка + бейдж */
 .event-card.is-top {
   background: linear-gradient(170deg, rgba(255, 180, 84, .07), transparent 42%), var(--pitch-1);
