@@ -874,6 +874,15 @@ body.events-open .composer-wrap { display: none; }
 .ev-mi-country { font-family: var(--f-mono); font-size: 10px; color: var(--faint); flex: none; }
 .ev-mi-count { font-family: var(--f-mono); font-size: 10px; color: var(--faint); flex: none; }
 .ev-menu-empty { color: var(--faint); font-size: 12px; text-align: center; padding: 12px; }
+/* меню пресетов на карточке: фиксированное, у кнопки, над ней */
+.ev-preset {
+  position: fixed;
+  left: 0; top: 0;
+  width: 250px;
+  max-height: none;
+  z-index: 90;
+}
+.ev-preset .ev-menu-list button { padding: 9px 11px; font-size: 12px; font-weight: 600; }
 
 .events-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 20px 24px; }
 

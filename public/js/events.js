@@ -6,6 +6,51 @@ import { api } from './api.js';
 
 const TZ = Math.round(-new Date().getTimezoneOffset() / 60);
 
+/* ── пресеты анализа по рынкам (аналог «продуктов» Fatum) ──
+ * marketId из /Odds/prematch-markets: 1=1X2, 5=Тотал 2.5, 8=Обе забьют,
+ * 10=Точный счёт, 16/17=индивидуальные тоталы, 45=Тотал угловых, 55=Угловые 1X2 */
+const PRESETS = [
+  { id: 'all', label: 'Обзор всех рынков' },
+  { id: 'score', label: 'Исходы и точный счёт' },
+  { id: 'totals', label: 'Тоталы' },
+  { id: 'corners', label: 'Угловые' },
+  { id: 'btts', label: 'Голы: обе забьют' },
+];
+
+function presetPrompt(id, m) {
+  const head = (title) => `⚡ ${title}: «${m.home} — ${m.away}»${m.origPair} (${m.league}, ${m.time}, gameId ${m.id} в sstats). `;
+  const tail = ' Без преамбулы — сразу таблицы и вывод.';
+  switch (id) {
+    case 'score':
+      return head('Анализ рынка «Исходы и точный счёт»') +
+        'Разбери исходы 1 / ничья / 2 и точный счёт: вероятности, топ-5 наиболее вероятных счётов. ' +
+        'Сравни кэфы букмекеров по рынкам 1 и 10 (sstats_odds) с fair odds, покажи маржу. ' +
+        'Формат: таблица исходов + таблица топ-счётов + вывод, где value (процент отклонения и решение).' + tail;
+    case 'totals':
+      return head('Анализ рынка «Тоталы»') +
+        'Разбери Тотал больше/меньше 1.5, 2.5, 3.5 и индивидуальные тоталы команд (рынки 5 и 16/17 в sstats_odds). ' +
+        'Опора — средние тоталы и xG обеих команд за последние матчи (match_preview_stats). ' +
+        'Формат: таблица «рынок — лучшая цена — fair — вердикт (процент и решение)».' + tail;
+    case 'corners':
+      return head('Анализ рынка «Угловые»') +
+        'Собери статистику угловых обеих команд за последние матчи (статистика матчей в sstats), ' +
+        'сравни с линией угловых — рынки 45 (тотал), 55 (1X2), 57/58 (индивидуальные) в sstats_odds, если лига покрыта. ' +
+        'Дай прогноз по тоталу угловых и лучшие рынки. Формат: таблица + вывод (процент и решение).' + tail;
+    case 'btts':
+      return head('Анализ рынка «Голы: обе забьют»') +
+        'Оцени «Обе забьют — да» и «нет» (рынок 8 в sstats_odds): пропущенные и забитые за последние матчи, ' +
+        'качество атаки и обороны, H2H — в скольких матчах обе забили. Сравни кэфы с fair. ' +
+        'Формат: таблица + вывод (процент и решение).' + tail;
+    default:
+      return head('Обзор всех рынков') +
+        'Прогони через sstats-инструменты основные маркеты: 1X2, двойной шанс, тоталы 1.5/2.5/3.5, обе забьют. ' +
+        'Сравни линии букмекеров между собой, покажи таблицу кэфов и короткий вывод по каждому рынку. ' +
+        'Рынки называй по-русски («Тотал больше 2.5», «Обе забьют — да»); в «Выводе» каждой строки — ' +
+        'процент отклонения цены от fair и решение, а не просто «минус». ' +
+        'Отметь, где линия выглядит подозрительной или завышенной.' + tail;
+  }
+}
+
 /* ── русификация: страны, лиги, туры (только отображение, ключи не трогаем) ── */
 const COUNTRY_RU = {
   England: 'Англия', Spain: 'Испания', Italy: 'Италия', Germany: 'Германия', France: 'Франция',
@@ -598,7 +643,7 @@ export function createEvents({ chat }) {
       </div>` : ''}
       <div class="ev-actions">
         <button class="ev-btn" data-act="chat" title="Добавить матч в чат — продолжишь формулировку сам">＋ В чат</button>
-        <button class="ev-btn" data-act="quick" title="Быстрый прогон основных маркетов и линий">⚡ Быстро</button>
+        <button class="ev-btn" data-act="preset" title="Быстрый анализ по выбранному рынку">Анализ ▾</button>
         <button class="ev-btn ev-primary" data-act="full" title="Полный анализ по методологии и решение по ставке">🎯 Полный разбор</button>
       </div>`;
 
@@ -625,9 +670,9 @@ export function createEvents({ chat }) {
       $('#input').dispatchEvent(new Event('input'));
       toast('Матч добавлен в чат — допиши, что именно разобрать', 'ok', 3200);
     });
-    el.querySelector('[data-act="quick"]').addEventListener('click', () => {
-      close();
-      chat.send(quickPrompt(meta));
+    el.querySelector('[data-act="preset"]').addEventListener('click', (e) => {
+      e.stopPropagation();
+      openPresetMenu(e.currentTarget, meta);
     });
     el.querySelector('[data-act="full"]').addEventListener('click', () => {
       close();
@@ -642,13 +687,40 @@ export function createEvents({ chat }) {
     return `Матч «${m.home} — ${m.away}»${m.origPair} (${m.league}, ${m.time}, gameId ${m.id} в sstats). Добавь его в разбор: собери свежие данные по обеим командам и оцени ситуацию перед игрой. Что именно разобрать подробнее — напишу ниже: `;
   }
 
-  function quickPrompt(m) {
-    return `⚡ Быстрый анализ: «${m.home} — ${m.away}»${m.origPair} (${m.league}, ${m.time}, gameId ${m.id} в sstats). ` +
-      'Прогони через sstats-инструменты основные маркеты: 1X2, двойной шанс, тоталы 1.5/2.5, обе забьют. ' +
-      'Сравни линии букмекеров между собой, покажи таблицу кэфов и короткий вывод по каждому рынку. ' +
-      'Рынки называй по-русски («Тотал больше 2.5», «Обе забьют — да»); в «Выводе» каждой строки — ' +
-      'процент отклонения цены от fair и решение, а не просто «минус». ' +
-      'Отметь, где линия выглядит подозрительной или завышенной. Без длинной преамбулы — таблицы и вывод.';
+  /* ---------- меню пресетов анализа ---------- */
+  const presetMenu = $('#evPresetMenu');
+  const presetList = $('#evPresetList');
+  let presetMeta = null;
+
+  function openPresetMenu(btn, meta) {
+    presetMeta = meta;
+    paintPresetMenu();
+    presetMenu.hidden = false;
+    const r = btn.getBoundingClientRect();
+    presetMenu.hidden = false;
+    const w = presetMenu.offsetWidth;
+    presetMenu.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - w - 8))}px`;
+    presetMenu.style.top = `${Math.max(8, r.top - presetMenu.offsetHeight - 8)}px`;
+  }
+
+  function hidePresetMenu() {
+    presetMenu.hidden = true;
+    presetMeta = null;
+  }
+
+  function paintPresetMenu() {
+    presetList.replaceChildren(...PRESETS.map((p) => {
+      const b = document.createElement('button');
+      b.textContent = p.label;
+      b.addEventListener('click', () => {
+        const meta = presetMeta;
+        hidePresetMenu();
+        if (!meta) return;
+        close();
+        chat.send(presetPrompt(p.id, meta));
+      });
+      return b;
+    }));
   }
 
   function fullPrompt(m) {
@@ -686,6 +758,17 @@ export function createEvents({ chat }) {
       groupFilter = b.dataset.group;
       render();
     });
+  });
+
+  /* ---------- меню пресетов: закрытие ---------- */
+  document.addEventListener('click', (e) => {
+    if (!presetMenu.hidden && !presetMenu.contains(e.target)) hidePresetMenu();
+  });
+  $('#eventsScroll').addEventListener('scroll', () => {
+    if (!presetMenu.hidden) hidePresetMenu();
+  }, { passive: true });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !presetMenu.hidden) hidePresetMenu();
   });
 
   /* ---------- фильтр лиг: события UI ---------- */
