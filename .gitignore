@@ -19,3 +19,4 @@ workspace/.claude/settings.local.json
 .DS_Store
 Thumbs.db
 shots/
+.mimosa/

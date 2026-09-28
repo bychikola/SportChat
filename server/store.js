@@ -159,7 +159,9 @@ export function saveSession(sessionId, title, model) {
 }
 
 export function deleteSession(sessionId) {
-  const list = readSessions().filter((s) => s.id !== sessionId);
+  // id приходит из запроса — оставляем только безопасные символы (сравнение с JSON)
+  const safeId = String(sessionId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+  const list = readSessions().filter((s) => s.id !== safeId);
   fs.writeFileSync(SESSIONS_FILE, JSON.stringify(list, null, 2));
 }
 
@@ -268,8 +270,12 @@ export function writeSkill(name, description, body, originalName = null) {
   if (!cleanName) return { ok: false, error: 'Имя навыка: строчные латинские буквы, цифры и дефис' };
   const targetDir = path.join(SKILLS_DIR(), cleanName);
   if (originalName && originalName !== cleanName) {
-    const oldDir = path.join(SKILLS_DIR(), originalName);
-    if (fs.existsSync(oldDir)) fs.rmSync(oldDir, { recursive: true, force: true });
+    // originalName приходит из запроса — жёстко ограничиваем имя папки
+    const base = path.basename(String(originalName));
+    const oldDir = path.join(SKILLS_DIR(), base);
+    if (path.resolve(oldDir).startsWith(path.resolve(SKILLS_DIR()) + path.sep) && fs.existsSync(oldDir)) {
+      fs.rmSync(oldDir, { recursive: true, force: true });
+    }
   }
   fs.mkdirSync(targetDir, { recursive: true });
   const file = `---\nname: ${cleanName}\ndescription: ${String(description || '').replace(/\n/g, ' ').slice(0, 400)}\n---\n\n${body || ''}`;
@@ -279,6 +285,8 @@ export function writeSkill(name, description, body, originalName = null) {
 
 export function deleteSkill(name) {
   const dir = path.join(SKILLS_DIR(), path.basename(name));
+  // страховка: удаляем только папки внутри SKILLS_DIR
+  if (!path.resolve(dir).startsWith(path.resolve(SKILLS_DIR()) + path.sep)) return;
   if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
 }
 
@@ -445,6 +453,8 @@ export function readPluginStore() {
 /* ---------- transcript replay ---------- */
 
 export function findTranscriptFile(sessionId) {
+  // sessionId приходит из запроса и интерполируется в путь — только UUID-подобные
+  if (!/^[a-f0-9-]{8,64}$/i.test(String(sessionId || ''))) return null;
   const projectsRoot = path.join(os.homedir(), '.claude', 'projects');
   if (!fs.existsSync(projectsRoot)) return null;
   const enc = WORKSPACE.replace(/[^A-Za-z0-9]/g, '-');
