@@ -12,10 +12,12 @@ import {
   writePluginSelection, readPluginStore,
 } from './store.js';
 import sstatsRouter from './sstats.js';
+import signalsRouter from './signals.js';
 
 const router = express.Router();
 
 router.use('/sstats', sstatsRouter);
+router.use('/signals', signalsRouter);
 
 /* ---------- meta & sessions ---------- */
 

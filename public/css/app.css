@@ -928,7 +928,7 @@ body.events-open .composer-wrap { display: none; }
 
 /* плитки статусов: в эфире / скоро / завершено */
 .ev-tiles {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
   max-width: 1240px; margin: 0 auto 14px;
 }
 .ev-tile {
@@ -1389,6 +1389,8 @@ body { -webkit-tap-highlight-color: transparent; }
   /* события: одна колонка, плотнее */
   .events-head { padding: 10px 12px; }
   .ev-insights { grid-template-columns: 1fr; gap: 8px; }
+  .ev-tile b { font-size: 15px; }
+  .ev-tile span { font-size: 7.5px; }
   .events-cap { flex-direction: column; align-items: flex-start; gap: 2px; }
   .events-nav { width: 100%; }
   .events-scroll { padding: 12px 10px 20px; }

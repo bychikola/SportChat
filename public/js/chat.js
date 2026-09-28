@@ -1,6 +1,7 @@
 /* Чат: сборка стрима, карточки инструментов, разрешения, история */
 
-import { $, esc, icon, toolIcon, toolSummary, fmtCost, fmtInt, timeStr } from './util.js';
+import { $, esc, icon, toolIcon, toolSummary, fmtCost, fmtInt, timeStr, toast } from './util.js';
+import { api } from './api.js';
 import { mdToHtml } from './md.js';
 
 const PERM_TIMEOUT_MS = 180_000;
@@ -284,6 +285,62 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
     scrollDown();
   }
 
+  /* ── сигнал из финального текста (СИГНАЛ: key=… | …) ── */
+  function extractSignal(cur) {
+    const text = [...cur.bubble.querySelectorAll('.md')].map((el) => el.textContent).join('\n');
+    const line = /СИГНАЛ:\s*([^\n]+)/.exec(text);
+    if (!line) return;
+    const fields = {};
+    const re = /([a-zа-яё]+)\s*=\s*([^|]+)/gi;
+    let p;
+    while ((p = re.exec(line[1]))) {
+      fields[p[1].trim().toLowerCase()] = p[2].trim();
+    }
+    if (!fields.gameid || !fields.key || !fields.pick) return;
+
+    const card = document.createElement('div');
+    card.className = 'signal-card notch';
+    card.innerHTML = `
+      <div class="sig-head">${icon('bolt')} Сигнал — сохранить в трекер точности?</div>
+      <div class="sig-body">
+        <div><span>Матч</span><b>${esc(fields.матч || '—')}</b></div>
+        <div><span>Лига</span><b>${esc(fields.лига || '—')}</b></div>
+        <div><span>Рынок</span><b>${esc(fields.рынок || '—')}</b></div>
+        <div><span>Ставка</span><b>${esc(fields.pick)}</b></div>
+        ${fields.кэф ? `<div><span>Кэф</span><b>${esc(fields.кэф)}</b></div>` : ''}
+        ${fields.уверенность ? `<div><span>Уверенность</span><b>${esc(fields.уверенность)}</b></div>` : ''}
+      </div>
+      <button class="btn-primary notch-sm sig-save">Сохранить как сигнал</button>`;
+
+    card.querySelector('.sig-save').addEventListener('click', async (e) => {
+      const b = e.currentTarget;
+      b.disabled = true;
+      b.textContent = 'Сохраняю…';
+      try {
+        await api('/signals', { method: 'POST', body: {
+          gameId: fields.gameid,
+          match: fields.матч || '',
+          league: fields.лига || '',
+          market: fields.рынок || '',
+          key: fields.key,
+          pick: fields.pick,
+          odds: fields.кэф || null,
+          confidence: fields.уверенность || '',
+          date: fields.дата || '',
+        }});
+        b.textContent = 'Сохранено ✓';
+        toast('Сигнал сохранён — точность посчитается после матча', 'ok', 3600);
+      } catch (err) {
+        b.disabled = false;
+        b.textContent = 'Сохранить как сигнал';
+        toast(err.message, 'err');
+      }
+    });
+
+    cur.wrap.appendChild(card);
+    scrollDown(true);
+  }
+
   function finishRunMeta(m) {
     if (!m || !cur) return;
     // при догенерации заменяем предыдущую мета-строку, а не копим
@@ -315,6 +372,8 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
       ${m.costUsd ? `<span>ответ: <b>${fmtCost(m.costUsd)}</b></span>` : ''}
       <span>сессия всего: <b>${fmtCost(S.cost)}</b></span>`;
     cur.wrap.appendChild(meta);
+
+    try { extractSignal(cur); } catch { /* некритично */ }
   }
 
   /* ── обработка событий агента ── */

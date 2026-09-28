@@ -12,7 +12,7 @@ const router = express.Router();
 const SSTATS_BASE = 'https://api.sstats.net';
 const PAGE = 1000; // лимит одной страницы API
 
-function loadApiKey() {
+export function loadApiKey() {
   if (process.env.SSTATS_API_KEY) return process.env.SSTATS_API_KEY.trim();
   try {
     const here = path.dirname(fileURLToPath(import.meta.url));

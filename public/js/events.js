@@ -1,7 +1,7 @@
 /* Страница «События»: карточки предстоящих матчей с sstats.net
  * и кнопки отправки матча в чат (в чат / быстрый анализ / полный разбор). */
 
-import { $, esc, toast } from './util.js';
+import { $, esc, toast, openModal } from './util.js';
 import { api } from './api.js';
 
 const TZ = Math.round(-new Date().getTimezoneOffset() / 60);
@@ -410,6 +410,7 @@ export function createEvents({ chat }) {
   let leagueFilter = null; // ключ лиги (id) или null = все
   let groupFilter = 'soon';// 'live' | 'soon' | 'done'
   let autoTimer = null;
+  let accStats = null; // статистика сигналов из /api/signals
 
   function isOpen() {
     return document.body.classList.contains('events-open');
@@ -454,11 +455,12 @@ export function createEvents({ chat }) {
     grid.replaceChildren();
     const date = dateStr(dayOffset);
     const r = refresh ? '&refresh=1' : '';
-    const [up, lv, fin, yest] = await Promise.allSettled([
+    const [up, lv, fin, yest, sig] = await Promise.allSettled([
       api(`/sstats/upcoming?date=${date}&limit=1000&tz=${TZ}${r}`),
       api(`/sstats/live?tz=${TZ}${r}`),
       api(`/sstats/finished?date=${date}&tz=${TZ}${r}`),
       api(`/sstats/finished?date=${dateStr(-1)}&tz=${TZ}${r}`),
+      api('/signals'),
     ]);
     const take = (p) => (p.status === 'fulfilled' && p.value?.status === 'OK' && Array.isArray(p.value.data)) ? p.value.data : null;
     const errs = [up, lv, fin].filter((p) => p.status === 'rejected').map((p) => p.reason?.message);
@@ -468,6 +470,7 @@ export function createEvents({ chat }) {
     }
     if (errs.length) toast(`Часть данных не загрузилась: ${errs[0]}`, 'warn', 4000);
     const upD = take(up), lvD = take(lv), finD = take(fin), yD = take(yest);
+    if (sig.status === 'fulfilled' && sig.value?.ok) accStats = sig.value.stats ?? null;
     if (upD) lastGames = upD;
     if (lvD) liveGames = lvD;
     if (finD) doneGames = finD;
@@ -475,6 +478,44 @@ export function createEvents({ chat }) {
     updateLeagueBtn();
     render();
     renderInsights();
+  }
+
+
+  /* ---------- модалка сигналов (трекер точности) ---------- */
+  async function openAccModal() {
+    const body = document.createElement('div');
+    body.innerHTML = '<div class="mm-loading">Загружаю сигналы…</div>';
+    const modal = openModal({ title: 'Трекер точности сигналов', body });
+    try {
+      const j = await api('/signals');
+      const st = j.stats || {};
+      const stLine = `Всего: <b>${st.total ?? 0}</b> · в работе: <b>${st.pending ?? 0}</b> · завершено: <b>${st.settled ?? 0}</b> (зашло <b style="color:var(--mint)">${st.won ?? 0}</b> / не зашло <b style="color:var(--live)">${st.lost ?? 0}</b>)`;
+      const byMarket = Object.entries(st.byMarket || {}).map(([m, v]) =>
+        `<span><b>${esc(m)}</b> — ${v.accuracy}% (${v.won}/${v.settled})</span>`).join('');
+      const rows = (j.signals || []).map((x) => {
+        const cls = x.status === 'won' ? 'ok' : x.status === 'lost' ? 'err' : x.status === 'void' ? '' : 'run';
+        const label = x.status === 'won' ? 'зашло' : x.status === 'lost' ? 'не зашло' : x.status === 'void' ? 'возврат' : 'в работе';
+        return `<div class="evi-row"><span class="evi-lg">${esc(x.league || '')}</span>
+          <span class="evi-t">${esc(x.pick)} <span class="mm-hint">@${esc(x.odds ? String(x.odds) : '—')} · ${esc(x.match || '')}</span></span>
+          <span class="st st-${cls || 'ok'}">${label}${x.result?.score ? ' ' + esc(x.result.score) : ''}</span>
+          <button class="card-x" title="Удалить" data-id="${esc(x.id)}">✕</button></div>`;
+      }).join('');
+      body.innerHTML = `
+        <div class="field"><label>Сводка</label><div class="hint">${stLine}</div></div>
+        ${byMarket ? `<div class="field"><label>По рынкам</label><div class="evi-stats">${byMarket}</div></div>` : ''}
+        <div class="field"><label>Сигналы</label><div class="signals-list">${rows || '<div class="evi-empty">Сигналов ещё нет — сохрани их из полных разборов в чате</div>'}</div></div>`;
+      body.querySelectorAll('.card-x').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          try {
+            await api('/signals/' + btn.dataset.id, { method: 'DELETE' });
+            modal.close();
+            openAccModal();
+          } catch (e) { toast(e.message, 'err'); }
+        });
+      });
+    } catch (e) {
+      body.innerHTML = `<div class="evi-empty">Не удалось загрузить: ${esc(e.message)}</div>`;
+    }
   }
 
   /* ---------- инсайты: лига дня + итоги вчера ---------- */
@@ -553,8 +594,12 @@ export function createEvents({ chat }) {
       soon: sortGames(lastGames.filter(leagueMatch)),
       done: sortGames(doneGames.filter(leagueMatch)),
     };
-    // плитки-счётчики
+    // плитки-счётчики + точность
     for (const b of document.querySelectorAll('.ev-tile')) {
+      if (b.dataset.group === 'acc') {
+        b.querySelector('b').textContent = accStats?.accuracy != null ? `${accStats.accuracy}%` : '—';
+        continue;
+      }
       const n = groups[b.dataset.group]?.length ?? 0;
       b.querySelector('b').textContent = String(n);
       b.classList.toggle('active', b.dataset.group === groupFilter);
@@ -800,6 +845,7 @@ export function createEvents({ chat }) {
       '2) построй вероятности по основным маркетам (1X2, тоталы, обе забьют, форы); ' +
       '3) сравни с линиями букмекеров — fair odds, маржа, value; ' +
       '4) итог: сценарии матча, чёткое решение — какую ставку брать или пропустить, размер позиции (≤1–3% банка) и уровень уверенности. ' +
+      'Если в итоге есть ставка — заверши ответ служебной строкой СИГНАЛ в формате из системного промпта. ' +
       'Рынки в таблицах называй по-русски («Тотал больше 2.5», «Обе забьют — да»), в колонке «Вывод» — ' +
       'процент отклонения цены от fair и решение, без голых «минус»/«≈0».';
   }
@@ -826,6 +872,7 @@ export function createEvents({ chat }) {
   /* ---------- плитки статусов: переключение групп ---------- */
   document.querySelectorAll('.ev-tile').forEach((b) => {
     b.addEventListener('click', () => {
+      if (b.dataset.group === 'acc') { openAccModal(); return; }
       groupFilter = b.dataset.group;
       render();
     });
