@@ -1625,8 +1625,8 @@ html, body { overflow-x: clip; }
      под композером пусто; резерв = высота bottom-nav */
   .under-composer { margin: 0; }
   .under-composer:empty, .under-composer .uc-session[hidden] { display: none; }
-  .composer-wrap { padding-bottom: calc(76px + var(--sab)); }
-  .toasts { bottom: calc(116px + var(--sab)); }
+  .composer-wrap { padding-bottom: calc(38px + var(--sab)); } /* nav 57px: композер вплотную, зазор ~8px */
+  .toasts { bottom: calc(96px + var(--sab)); }
 
   /* ошибка загрузки: кнопка «Повторить» рядом с текстом */
   .events-notice button { min-height: 40px; padding: 8px 16px; margin: 6px 0 0 10px; }
