@@ -100,7 +100,9 @@ export class ChatConnection {
 
   send(obj) {
     if (process.env.SPORTCHAT_DEBUG) console.log('[ws-out]', obj.t, obj.kind || obj.subtype || '');
-    if (this.ws.readyState === 1) this.ws.send(JSON.stringify(obj));
+    // соединение могло закрыться/обновиться в середине хода — молча пропускаем,
+    // иначе крэш процесса (падение после завершения turn)
+    if (this.ws && this.ws.readyState === 1) this.ws.send(JSON.stringify(obj));
   }
 
   /* ---------- incoming WS messages ---------- */
