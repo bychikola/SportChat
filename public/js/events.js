@@ -86,6 +86,77 @@ function countryRu(name) {
 
 /* ── русские названия команд АПЛ / Ла Лиги / Бундеслиги ── */
 const TEAM_RU = [
+  // сборные (Лига наций, отбор, ЧМ)
+  ['Россия', 'Russia'],
+  ['Бразилия', 'Brazil'],
+  ['Аргентина', 'Argentina'],
+  ['Франция', 'France'],
+  ['Англия', 'England'],
+  ['Испания', 'Spain'],
+  ['Италия', 'Italy'],
+  ['Германия', 'Germany'],
+  ['Португалия', 'Portugal'],
+  ['Нидерланды', 'Netherlands'],
+  ['Бельгия', 'Belgium'],
+  ['Хорватия', 'Croatia'],
+  ['Дания', 'Denmark'],
+  ['Швейцария', 'Switzerland'],
+  ['Австрия', 'Austria'],
+  ['Польша', 'Poland'],
+  ['Швеция', 'Sweden'],
+  ['Норвегия', 'Norway'],
+  ['Турция', 'Turkey', 'Türkiye'],
+  ['Украина', 'Ukraine'],
+  ['Сербия', 'Serbia'],
+  ['Чехия', 'Czechia', 'Czech Republic'],
+  ['Словакия', 'Slovakia'],
+  ['Венгрия', 'Hungary'],
+  ['Румыния', 'Romania'],
+  ['Греция', 'Greece'],
+  ['Шотландия', 'Scotland'],
+  ['Уэльс', 'Wales'],
+  ['Ирландия', 'Ireland', 'Republic of Ireland'],
+  ['Северная Ирландия', 'Northern Ireland'],
+  ['Финляндия', 'Finland'],
+  ['Исландия', 'Iceland'],
+  ['Грузия', 'Georgia'],
+  ['Армения', 'Armenia'],
+  ['Азербайджан', 'Azerbaijan'],
+  ['Казахстан', 'Kazakhstan'],
+  ['Израиль', 'Israel'],
+  ['США', 'USA', 'United States'],
+  ['Мексика', 'Mexico'],
+  ['Канада', 'Canada'],
+  ['Коста-Рика', 'Costa Rica'],
+  ['Панама', 'Panama'],
+  ['Гондурас', 'Honduras'],
+  ['Ямайка', 'Jamaica'],
+  ['Гаити', 'Haiti'],
+  ['Кюрасао', 'Curaçao', 'Curacao'],
+  ['Никарагуа', 'Nicaragua'],
+  ['Доминика', 'Dominica'],
+  ['Пуэрто-Рико', 'Puerto Rico'],
+  ['Суринам', 'Suriname'],
+  ['Япония', 'Japan'],
+  ['Южная Корея', 'South Korea', 'Korea Republic'],
+  ['Австралия', 'Australia'],
+  ['Саудовская Аравия', 'Saudi Arabia'],
+  ['Египет', 'Egypt'],
+  ['Марокко', 'Morocco'],
+  ['Нигерия', 'Nigeria'],
+  ['Сенегал', 'Senegal'],
+  ['Гана', 'Ghana'],
+  ["Кот-д'Ивуар", "Ivory Coast", "Cote d'Ivoire"],
+  ['Алжир', 'Algeria'],
+  ['Тунис', 'Tunisia'],
+  ['Уругвай', 'Uruguay'],
+  ['Колумбия', 'Colombia'],
+  ['Чили', 'Chile'],
+  ['Перу', 'Peru'],
+  ['Эквадор', 'Ecuador'],
+  ['Парагвай', 'Paraguay'],
+  ['Венесуэла', 'Venezuela'],
+  ['Боливия', 'Bolivia'],
   // АПЛ
   ['Арсенал', 'Arsenal', 'Arsenal FC'],
   ['Астон Вилла', 'Aston Villa'],
@@ -474,9 +545,31 @@ export function createEvents({ chat }) {
     dateInput.value = dateStr(dayOffset);
   }
 
+  function renderSkeleton() {
+    grid.replaceChildren();
+    for (let i = 0; i < 3; i++) {
+      const d = document.createElement('div');
+      d.className = 'event-card skel';
+      d.innerHTML = `
+        <span class="sk-line w25"></span>
+        <span class="sk-line w70"></span>
+        <span class="sk-line w45"></span>
+        <div class="sk-row"><span class="sk-line"></span><span class="sk-line"></span></div>`;
+      grid.appendChild(d);
+    }
+  }
+
+  function retryBtn() {
+    const b = document.createElement('button');
+    b.className = 'btn-secondary notch-sm';
+    b.textContent = 'Повторить';
+    b.addEventListener('click', () => load());
+    return b;
+  }
+
   async function load(refresh = false) {
     setNotice('Загружаю матчи…', 'info');
-    grid.replaceChildren();
+    renderSkeleton();
     const date = dateStr(dayOffset);
     const r = refresh ? '&refresh=1' : '';
     const [up, lv, fin, yest, sig] = await Promise.allSettled([
@@ -487,11 +580,18 @@ export function createEvents({ chat }) {
       api('/signals'),
     ]);
     const take = (p) => (p.status === 'fulfilled' && p.value?.status === 'OK' && Array.isArray(p.value.data)) ? p.value.data : null;
-    const errs = [up, lv, fin].filter((p) => p.status === 'rejected').map((p) => p.reason?.message);
-    if (errs.length === 3) {
-      setNotice(`Не удалось загрузить матчи: ${errs[0] || 'нет данных от SStats'}`, 'error');
+    // сервер может ответить 200 с {error} — это тоже неудача загрузки
+    const reason = (p) => p.status === 'rejected'
+      ? (p.reason?.message || 'нет связи с сервером')
+      : (p.value?.error || (p.value?.status === 'OK' ? '' : 'нет данных от SStats'));
+    if (!take(up) && !take(lv) && !take(fin)) {
+      const why = [reason(up), reason(lv), reason(fin)].find(Boolean) || 'нет данных от SStats';
+      grid.replaceChildren();
+      setNotice(`Не удалось загрузить матчи — ${why}. Проверь связь и попробуй ещё раз.`, 'error');
+      notice.appendChild(retryBtn());
       return;
     }
+    const errs = [up, lv, fin].filter((p) => p.status === 'rejected').map((p) => p.reason?.message);
     if (errs.length) toast(`Часть данных не загрузилась: ${errs[0]}`, 'warn', 4000);
     const upD = take(up), lvD = take(lv), finD = take(fin), yD = take(yest);
     if (sig.status === 'fulfilled' && sig.value?.ok) accStats = sig.value.stats ?? null;

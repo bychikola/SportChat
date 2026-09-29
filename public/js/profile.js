@@ -84,6 +84,9 @@ export function createProfile() {
 
     const submit = async () => {
       err.classList.remove('show');
+      const busy = submitBtn.textContent;
+      submitBtn.disabled = true;
+      submitBtn.textContent = mode === 'register' ? 'Создаю…' : 'Вхожу…';
       try {
         const loginVal = loginInput.value.trim();
         const type = loginVal.includes('@') ? 'email' : 'phone';
@@ -100,10 +103,16 @@ export function createProfile() {
       } catch (e) {
         err.textContent = e.message;
         err.classList.add('show');
+        submitBtn.disabled = false;
+        submitBtn.textContent = busy;
       }
     };
     submitBtn.addEventListener('click', submit);
     loginInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+    // клавиатура под ввод: «+» → телефонная, иначе — с @
+    loginInput.addEventListener('input', () => {
+      loginInput.inputMode = loginInput.value.startsWith('+') ? 'tel' : 'email';
+    });
     setTimeout(() => loginInput.focus(), 100);
   }
 

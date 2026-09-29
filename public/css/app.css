@@ -1541,3 +1541,92 @@ body { -webkit-tap-highlight-color: transparent; }
     padding: 0;
   }
 }
+
+/* ═══════════ ПОЛИРОВКА ПО UX-ПРАВИЛАМ (ux-ui-rules.md, 2026-09-29) ═══════════
+   Блок идёт после всех прочих media-секций — каскад перебивает их на мобиле. */
+
+/* нет горизонтального расползания страницы: от ширины документа считаются
+   fixed-оверлеи, любое переполнение раздувает и модалки */
+html, body { overflow-x: clip; }
+
+/* фокус с клавиатуры всегда виден (доступность) */
+:focus-visible { outline: 2px solid rgba(255, 180, 84, .75); outline-offset: 2px; }
+
+/* тап-фидбек: лёгкое нажатие вместо дефолтной вспышки подсветки
+   (она отключена глобально) */
+@media (hover: none) and (pointer: coarse) {
+  button:not(:disabled):active,
+  .evi-chip:active, .chip:active, .tile:active {
+    transform: scale(.97);
+    transition: transform .08s ease;
+  }
+}
+
+/* скелетон-карточки вместо «Загружаю матчи…» — сохраняют layout, нет прыжка */
+.event-card.skel { pointer-events: none; min-height: 118px; }
+.sk-line {
+  display: block; height: 10px; border-radius: 6px; margin: 9px 0;
+  background: linear-gradient(90deg, var(--pitch-3) 25%, rgba(255, 180, 84, .12) 45%, var(--pitch-3) 65%);
+  background-size: 200% 100%;
+  animation: sk-shimmer 1.15s linear infinite;
+}
+.sk-line.w25 { width: 25%; } .sk-line.w45 { width: 45%; } .sk-line.w70 { width: 70%; }
+.sk-row { display: flex; gap: 8px; margin-top: 12px; }
+.sk-row .sk-line { flex: 1; margin: 0; height: 26px; }
+@keyframes sk-shimmer { from { background-position: 180% 0; } to { background-position: -80% 0; } }
+@media (prefers-reduced-motion: reduce) { .sk-line { animation: none; } }
+
+@media (max-width: 640px) {
+  /* шапка: убираем дубли и редкие инструменты — MCP/Skills/Консоль есть в
+     панели (railToggle), «События» дублирует нижняя навигация; настройки и
+     профиль остаются */
+  .tbtn[data-open="mcp"], .tbtn[data-open="skills"], .tbtn[data-open="cli"],
+  #eventsToggle { display: none; }
+
+  /* тач-цели ≥44px (Apple HIG / Material / NN/g) */
+  .tbtn { min-width: 44px; min-height: 44px; padding: 10px; }
+  .tablo-btn { padding: 12px 4px; min-height: 44px; display: inline-flex; align-items: center; } /* селектор модели */
+  .drawer-x { width: 44px; height: 44px; padding: 0; display: grid; place-items: center; }
+  .under-composer .uc-item { min-height: 44px; align-items: center; } /* чекбокс-лейбл: тап-зона */
+  .btn-send { min-height: 44px; }             /* «Отправить» */
+  .uc-select { min-height: 44px; }            /* «Режим прав» */
+  .chip { min-height: 44px; padding: 10px 16px; font-size: 13.5px; }  /* hero-чипы */
+  .modal-x { width: 44px; height: 44px; padding: 0; display: grid; place-items: center; }
+  .mini-icon { width: 44px; height: 44px; padding: 10px; }
+  .sess-del { width: 44px; height: 44px; padding: 0; display: grid; place-items: center; }
+
+  /* события: строка фильтров переносится, а не распирает страницу */
+  .events-nav { flex-wrap: wrap; }
+  /* карточки: жёсткая колонка — nowrap-лига не должна распирать grid-элемент */
+  .events-grid { grid-template-columns: minmax(0, 1fr); }
+  .event-card { min-width: 0; max-width: 100%; overflow: hidden; }
+  .ev-league { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  .ev-odds { flex-wrap: wrap; }
+  .ev-day { min-height: 44px; padding: 10px 18px; font-size: 13.5px; }
+  .ev-league-btn { min-height: 44px; }
+  .ev-date-input {
+    flex: 1 1 auto; min-width: 0; width: auto; min-height: 44px;
+    font-size: 16px; padding: 8px 12px;
+  }
+  .ev-btn { min-height: 44px; }               /* кнопки в карточках матчей */
+  .evi-chip { min-height: 44px; padding: 10px 16px; font-size: 13px; }
+  .ev-menu button { min-height: 44px; }       /* строки меню лиг и пресетов */
+
+  /* вход: сегменты и сабмит — цели 44px */
+  .auth-seg button { min-height: 44px; padding: 10px; }
+  .auth-submit { min-height: 48px; font-size: 14px; }
+
+  /* 16px у остальных полей — iOS зумит всё, что меньше (дата/лиги/избранное) */
+  #evDate, #evLeagueSearch, #favTeamInput, #favLeagueSel {
+    font-size: 16px; min-height: 44px; padding: 8px 12px;
+  }
+
+  /* «Режим прав»: не обрезать значение — строка одна, места хватает;
+     второй ряд (чекбокс конфига) не должен прятаться под bottom-nav */
+  .under-composer .uc-select { max-width: none; flex: 1 1 auto; }
+  .composer-wrap { padding-bottom: calc(118px + var(--sab)); }
+  .toasts { bottom: calc(158px + var(--sab)); }
+
+  /* ошибка загрузки: кнопка «Повторить» рядом с текстом */
+  .events-notice button { min-height: 40px; padding: 8px 16px; margin: 6px 0 0 10px; }
+}
