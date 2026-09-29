@@ -378,13 +378,23 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
   /* Экспресс: кастомная таблица ног вместо сырого markdown-списка */
   function extractExpress(cur) {
     for (const md of cur.bubble.querySelectorAll('.md')) {
-      const head = [...md.querySelectorAll(':scope > p')].find((el) => /^\s*ЭКСПРЕСС\s+[\d.,]+\s*x/i.test(el.textContent || ''));
+      // заголовок экспресса может быть h2/h3/p — модель выбирает сама
+      const head = [...md.querySelectorAll(':scope > p, :scope > h2, :scope > h3')]
+        .find((el) => /^\s*ЭКСПРЕСС\s+[\d.,]+\s*x/i.test(el.textContent || ''));
       if (!head) continue;
       const legsOl = head.nextElementSibling;
       if (!legsOl || !/^(OL|UL)$/.test(legsOl.tagName)) continue;
       const legs = [...legsOl.querySelectorAll(':scope > li')].map((li) => {
-        const m = /^\s*(?:\d+[.)]\s*)?(.+?)\s+—\s+(.+?)\s+@\s*([\d.,]+)/.exec(li.textContent.trim());
-        return m ? { match: m[1], market: m[2], odds: parseFloat(m[3].replace(',', '.')) } : null;
+        // «Матч с тире (время) — Рынок @ кэф — почему»: сегмент с «@» — это рынок,
+        // всё до него — матч (тире внутри названий команд не трогаем)
+        const parts = li.textContent.trim().split(/\s+—\s+/);
+        const i = parts.findIndex((p) => /@\s*[\d.,]+/.test(p));
+        if (i < 1) return null; // сегмент с кэфом не найден или рынок без матча
+        const match = parts.slice(0, i).join(' — ').replace(/\s*\(\d{1,2}:\d{2}\)\s*$/, '');
+        const [market, oddsRaw] = parts[i].split(/\s*@\s*/);
+        const odds = parseFloat(String(oddsRaw || '').replace(',', '.'));
+        if (!match || !market || !Number.isFinite(odds) || odds < 1) return null;
+        return { match, market: market.trim(), odds };
       }).filter(Boolean);
       if (legs.length < 2) continue;
 
@@ -396,7 +406,7 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
       const card = document.createElement('div');
       card.className = 'signal-card express notch';
       card.innerHTML = `
-        <div class="sig-head">${icon('bolt')} ЭКСПРЕСС ${odds.toFixed(2).replace('.', '.')}x${prob ? ` · вероятность ~${esc(prob)}%` : ''} — решение</div>
+        <div class="sig-head">${icon('bolt')} ЭКСПРЕСС ${odds.toFixed(2)}x${prob ? ` · вероятность ~${esc(prob)}%` : ''} — решение</div>
         <table class="sig-table">
           <thead><tr><th>№</th><th>Матч</th><th>Рынок</th><th>Кэф</th></tr></thead>
           <tbody>
