@@ -1005,5 +1005,5 @@ export function createEvents({ chat }) {
 
   markActiveDay();
 
-  return { toggle, open, close, isOpen };
+  return { toggle, open, close, isOpen, openTracker: openAccModal };
 }

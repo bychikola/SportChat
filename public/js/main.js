@@ -125,7 +125,45 @@ chat.bindSessionStarted((init) => {
 });
 
 const eventsView = createEvents({ chat });
-createProfile();
+const profile = createProfile();
+
+/* ══════════ PWA: нижняя навигация (мобильные) + service worker ══════════ */
+const bottomNav = $('#bottomNav');
+if (bottomNav) {
+  bottomNav.querySelectorAll('button').forEach((b) => {
+    b.addEventListener('click', () => {
+      const nav = b.dataset.nav;
+      if (nav === 'chat') eventsView.close();
+      if (nav === 'events') eventsView.open();
+      if (nav === 'tracker') eventsView.openTracker();
+      if (nav === 'profile') profile.open();
+    });
+  });
+  // активная вкладка следует за состоянием страницы событий
+  new MutationObserver(() => {
+    const open = document.body.classList.contains('events-open');
+    bottomNav.querySelectorAll('button').forEach((x) =>
+      x.classList.toggle('active', x.dataset.nav === (open ? 'events' : 'chat')));
+  }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+}
+
+// service worker: офлайн-оболочка PWA
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === '127.0.0.1' || location.hostname === 'localhost')) {
+  navigator.serviceWorker.register('/sw.js').catch(() => { /* без SW сайт тоже работает */ });
+}
+
+// подсказка установки на iPhone (Safari, не standalone)
+(function pwaHint() {
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const standalone = navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+  if (!isIOS || standalone || localStorage.getItem('sc_pwaHint')) return;
+  const hint = $('#pwaHint');
+  hint.hidden = false;
+  $('#pwaHintClose').addEventListener('click', () => {
+    hint.hidden = true;
+    localStorage.setItem('sc_pwaHint', '1');
+  });
+})();
 
 function shortModel(m) {
   if (!m || m === 'default') return 'по умолчанию';
@@ -220,7 +258,9 @@ async function renderModelMenu() {
       </div>`;
   } else {
     const prov = data.providers[act.provider];
-    if (prov && !prov.hasKey && prov.type !== 'openrouter') {
+    if (prov && !prov.hasKey) {
+      // без ключа провайдер неработоспособен — сначала вводим ключ
+      // (в т.ч. для openrouter: листинг моделей публичный, а запросы — нет)
       modelsHtml = `
         <div class="mm-keyrow">
           <input type="password" id="mmKey" placeholder="API-ключ ${esc(prov.label)}">

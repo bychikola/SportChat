@@ -130,6 +130,13 @@ export class ChatConnection {
       }
       if (sessionId) options.resume = sessionId;
 
+      // reasoning effort: высокий для всех прогонов (env поддерживается CLI)
+      options.env = {
+        ...(options.env ?? process.env),
+        CLAUDE_CODE_EFFORT_LEVEL: 'high',
+        MAX_THINKING_TOKENS: '31999',
+      };
+
       const turnStart = Date.now();
       // текст сообщения в логи НЕ пишем — это PII пользователя, только длину
       console.log(`[turn] старт: длина=${text.length} session=${sessionId || 'новый'} mode=${options.permissionMode}`);

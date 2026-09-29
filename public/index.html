@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <title>SportChat AI — аналитика спортивных событий</title>
 <meta name="description" content="Чат-аналитик спортивных событий: разборы матчей, вероятности и value в линии. MCP, навыки, права, консоль.">
+<meta name="theme-color" content="#0a100c">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="СПОРТЧАТ AI">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%230A100C'/%3E%3Cpath d='M13 3 6.5 13.5H11L10 21l7.5-11H12z' fill='%23FFB454'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -327,7 +334,20 @@
   </footer>
 </div>
 
-<div id="modalRoot"></div>
+  <!-- ═══════════ Нижняя навигация (только мобильные) ═══════════ -->
+  <nav class="bottom-nav" id="bottomNav" aria-label="Навигация приложения">
+    <button data-nav="chat" class="active"><svg><use href="#i-bolt"/></svg><span>Чат</span></button>
+    <button data-nav="events"><svg><use href="#i-cal"/></svg><span>События</span></button>
+    <button data-nav="tracker"><svg><use href="#i-clock"/></svg><span>Трекер</span></button>
+    <button data-nav="profile"><svg><use href="#i-user"/></svg><span>Профиль</span></button>
+  </nav>
+
+  <div id="pwaHint" class="pwa-hint" hidden>
+    📲 Установи как приложение: <b>Поделиться → На экран «Домой»</b>
+    <button id="pwaHintClose" aria-label="Скрыть">✕</button>
+  </div>
+
+  <div id="modalRoot"></div>
 <div id="toasts" class="toasts"></div>
 <div id="drawerBackdrop" class="drawer-backdrop"></div>
 

@@ -46,54 +46,51 @@ export function createProfile() {
   function openAuthModal() {
     const body = document.createElement('div');
     body.innerHTML = `
-      <div class="field">
-        <label>Вход или регистрация</label>
-        <div class="auth-switch">
-          <button class="evi-chip active" data-t="email">Email</button>
-          <button class="evi-chip" data-t="phone">Телефон</button>
-        </div>
+      <div class="auth-seg" role="tablist">
+        <button data-m="login" class="active">Вход</button>
+        <button data-m="register">Регистрация</button>
       </div>
       <div class="field">
-        <label id="authLoginLabel">Email</label>
-        <input type="text" id="authLogin" autocomplete="username" placeholder="you@example.com">
+        <label>Email или телефон</label>
+        <input type="text" id="authLogin" autocomplete="username" placeholder="you@example.com · +79991234567">
       </div>
       <div class="field">
         <label>Пароль</label>
         <input type="password" id="authPass" autocomplete="current-password" placeholder="Минимум 6 символов">
       </div>
-      <div class="field">
-        <label>Имя (необязательно)</label>
+      <div class="field" id="authNameField" hidden>
+        <label>Имя</label>
         <input type="text" id="authName" placeholder="Как отображать в профиле">
       </div>
-      <div class="auth-tabs">
-        <button class="btn-primary notch-sm" id="authLoginBtn">Войти</button>
-        <button class="btn-secondary" id="authRegBtn">Зарегистрироваться</button>
-      </div>
+      <button class="btn-primary notch-sm auth-submit" id="authSubmit">Войти</button>
       <div class="form-error" id="authErr"></div>
-      <div class="hint">Вход через Telegram будет добавлен позже — кнопка появится здесь.</div>`;
+      <div class="hint auth-hint">Вход через Telegram — скоро.</div>`;
 
-    let type = 'email';
+    let mode = 'login';
     const modal = openModal({ title: 'Профиль · вход', body });
     const err = body.querySelector('#authErr');
     const loginInput = body.querySelector('#authLogin');
-    const loginLabel = body.querySelector('#authLoginLabel');
+    const nameField = body.querySelector('#authNameField');
+    const submitBtn = body.querySelector('#authSubmit');
 
-    body.querySelectorAll('.auth-switch .evi-chip').forEach((b) => {
+    body.querySelectorAll('.auth-seg button').forEach((b) => {
       b.addEventListener('click', () => {
-        type = b.dataset.t;
-        body.querySelectorAll('.auth-switch .evi-chip').forEach((x) => x.classList.toggle('active', x === b));
-        loginLabel.textContent = type === 'phone' ? 'Телефон' : 'Email';
-        loginInput.placeholder = type === 'phone' ? '+79991234567' : 'you@example.com';
+        mode = b.dataset.m;
+        body.querySelectorAll('.auth-seg button').forEach((x) => x.classList.toggle('active', x === b));
+        nameField.hidden = mode !== 'register';
+        submitBtn.textContent = mode === 'register' ? 'Создать аккаунт' : 'Войти';
       });
     });
 
-    const submit = async (register) => {
+    const submit = async () => {
       err.classList.remove('show');
       try {
-        const payload = register
-          ? { type, login: loginInput.value, password: body.querySelector('#authPass').value, name: body.querySelector('#authName').value }
-          : { login: loginInput.value, password: body.querySelector('#authPass').value };
-        const j = await api(`/auth/${register ? 'register' : 'login'}`, { method: 'POST', body: payload });
+        const loginVal = loginInput.value.trim();
+        const type = loginVal.includes('@') ? 'email' : 'phone';
+        const payload = mode === 'register'
+          ? { type, login: loginVal, password: body.querySelector('#authPass').value, name: body.querySelector('#authName').value }
+          : { login: loginVal, password: body.querySelector('#authPass').value };
+        const j = await api(`/auth/${mode}`, { method: 'POST', body: payload });
         saveToken(j.token);
         user = j.user;
         modal.close();
@@ -105,8 +102,8 @@ export function createProfile() {
         err.classList.add('show');
       }
     };
-    body.querySelector('#authLoginBtn').addEventListener('click', () => submit(false));
-    body.querySelector('#authRegBtn').addEventListener('click', () => submit(true));
+    submitBtn.addEventListener('click', submit);
+    loginInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
     setTimeout(() => loginInput.focus(), 100);
   }
 
@@ -183,12 +180,14 @@ export function createProfile() {
     renderHeaderBtn();
   }
 
-  $('#profileBtn')?.addEventListener('click', () => {
+  const ready = boot();
+
+  $('#profileBtn')?.addEventListener('click', async () => {
+    await ready; // boot мог ещё не проверить токен — ждём, иначе гонка
     user ? openProfileModal() : openAuthModal();
   });
 
-  boot();
   renderHeaderBtn();
 
-  return { getUser: () => user };
+  return { getUser: () => user, open: async () => { await ready; user ? openProfileModal() : openAuthModal(); } };
 }

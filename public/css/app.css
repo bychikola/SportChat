@@ -257,11 +257,31 @@ body.rail-hidden .rail { overflow: hidden; border-left: none; }
 .profile-id { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .profile-id b { font-size: 16px; color: var(--chalk); }
 .profile-stats {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;
   margin: 4px 0 8px;
 }
+.profile-stats .cap-card { min-width: 0; width: 100%; padding: 8px 10px; }
+.profile-stats .cap-v { font-size: 11.5px; }
 .auth-switch { display: flex; gap: 8px; }
 .auth-tabs { display: flex; gap: 9px; justify-content: flex-end; }
+
+/* окно входа: сегмент-переключатель и широкая кнопка */
+.auth-seg {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
+  background: #0c1310; border: 1px solid var(--line-strong); border-radius: 10px;
+  padding: 4px; margin-bottom: 2px;
+}
+.auth-seg button {
+  border: none; background: none; color: var(--dim);
+  font-size: 13px; font-weight: 500; padding: 8px; border-radius: 7px;
+  cursor: pointer; transition: background .14s ease, color .14s ease;
+}
+.auth-seg button.active {
+  background: linear-gradient(160deg, var(--flut), var(--flut-deep));
+  color: var(--ink-on-flut); font-weight: 600;
+}
+.auth-submit { width: 100%; padding: 12px; font-size: 12.5px; }
+.auth-hint { text-align: center; }
 .tbtn {
   display: flex; align-items: center; gap: 7px;
   background: none; border: 1px solid transparent; border-radius: 9px;
@@ -1111,6 +1131,50 @@ body.events-open .composer-wrap { display: none; }
   border-color: transparent; color: var(--ink-on-flut); font-weight: 700;
 }
 .ev-btn.ev-primary:hover { color: var(--ink-on-flut); filter: brightness(1.08); background: linear-gradient(160deg, var(--flut), var(--flut-deep)); }
+
+/* ═══════════ PWA: нижняя навигация (только телефоны ≤640px) ═══════════ */
+.bottom-nav { display: none; }
+.pwa-hint {
+  display: none;
+  position: fixed; left: 10px; right: 10px; bottom: calc(70px + var(--sab));
+  z-index: 95;
+  background: linear-gradient(160deg, var(--flut), var(--flut-deep));
+  color: var(--ink-on-flut); font-size: 12.5px; font-weight: 500;
+  padding: 11px 40px 11px 14px; border-radius: 12px;
+  box-shadow: 0 12px 30px -10px rgba(232, 145, 43, .55);
+}
+.pwa-hint[hidden] { display: none; }
+.pwa-hint button {
+  position: absolute; right: 6px; top: 6px;
+  background: none; border: none; color: var(--ink-on-flut);
+  font-size: 13px; padding: 4px 8px; cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  /* app-режим: статусбар скрыт, снизу — навигация приложения */
+  #app { grid-template-rows: auto minmax(0, 1fr) 0px; }
+  .statusbar { display: none; }
+  .bottom-nav {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 90;
+    padding: 6px 6px calc(6px + var(--sab));
+    background: rgba(8, 13, 10, .97);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid var(--line-strong);
+  }
+  .bottom-nav button {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    background: none; border: none; color: var(--faint);
+    font-family: var(--f-mono); font-size: 8.5px; letter-spacing: .1em;
+    text-transform: uppercase; padding: 5px 0 3px; border-radius: 10px;
+  }
+  .bottom-nav button svg { width: 21px; height: 21px; }
+  .bottom-nav button.active { color: var(--flut); background: var(--flut-dim); }
+  /* композер и скролл не прячутся под навигацией */
+  .composer-wrap { padding-bottom: calc(74px + var(--sab)); }
+  .events-scroll { padding-bottom: calc(78px + var(--sab)); }
+  .toasts { bottom: calc(112px + var(--sab)); }
+}
 
 /* ═══════════ МОДАЛКИ / ФОРМЫ ═══════════ */
 .overlay {
