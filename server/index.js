@@ -1,10 +1,15 @@
 import express from 'express';
 import http from 'node:http';
+import dns from 'node:dns';
 import path from 'node:path';
 import { WebSocketServer } from 'ws';
 import { ROOT, ensureWorkspace } from './store.js';
 import { ChatConnection } from './agent.js';
 import apiRouter from './routes.js';
+
+// api.sstats.net отдаёт IPv6 (AAAA), но IPv6-маршрутизация у пользователей часто
+// сломана → Node лезет по v6 и падает «fetch failed». v4 работает всегда.
+dns.setDefaultResultOrder('ipv4first');
 
 const PORT = Number(process.env.SPORTCHAT_PORT || 3777);
 // в Docker контейнер обязан слушать 0.0.0.0; локально по умолчанию — только localhost

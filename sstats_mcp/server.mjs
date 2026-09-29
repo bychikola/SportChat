@@ -10,6 +10,10 @@
  * Регистрация: workspace/.mcp.json → { "type": "stdio", "command": "node",
  *   "args": ["../sstats_mcp/server.mjs"] }
  */
+import dns from 'node:dns';
+// api.sstats.net отдаёт IPv6 (AAAA), IPv6-маршрутизация у пользователей часто
+// сломана → «fetch failed». v4 работает — резолвим v4 первым.
+dns.setDefaultResultOrder('ipv4first');
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
