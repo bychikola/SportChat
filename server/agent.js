@@ -22,7 +22,7 @@ function buildAgents() {
   return {
     pool: {
       description: 'Этап 1 конвейера прогнозов: собирает пул ПРЕДСТОЯЩИХ матчей под запрос (дата, лиги, команды) через sstats и отсекает начавшиеся/завершённые. Вызывать первым.',
-      tools: ['mcp__sstats__sstats_search_matches', 'mcp__sstats__sstats_leagues'],
+      tools: ['mcp__sstats__sstats_search_matches', 'mcp__sstats__sstats_leagues', 'mcp__sstats__pari_matches'],
       prompt: `Ты — сборщик пула матчей для спортивного аналитика.
 ${T}
 ЗАДАЧА: по запросу собрать пул матчей для анализа — только предстоящие.
@@ -45,7 +45,7 @@ ${T}
     },
     markets: {
       description: 'Этап 3 конвейера: по шорт-листу анализирует ВСЕ рынки (тоталы, форы, обе забьют, угловые) и готовит заготовки ног. Вызывать после scout.',
-      tools: ['mcp__sstats__sstats_match_preview_stats', 'mcp__sstats__sstats_match_odds', 'mcp__sstats__sstats_get_match'],
+      tools: ['mcp__sstats__sstats_match_preview_stats', 'mcp__sstats__sstats_match_odds', 'mcp__sstats__sstats_get_match', 'mcp__sstats__pari_matches', 'mcp__sstats__pari_match', 'mcp__sstats__pari_market_types', 'mcp__sstats__pari_odds_history'],
       prompt: `Ты — маркет-аналитик SportChat (рынки и линии).
 ${T}
 Тебе дадут шорт-лист матчей с фактами формы. ЗАДАЧА: разобрать рынки, а не только победы.

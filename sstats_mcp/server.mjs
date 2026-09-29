@@ -363,6 +363,185 @@ server.registerTool(
   },
 );
 
+/* ═══════════ БУКМЕКЕР PARI (pari.ru) — линия, лайв, история кэфов ═══════════
+   Отдельный источник: свои id (eventId) — НЕ путать с id матчей SStats.
+   Коэффициенты удобнее и полнее, чем в sstats_matches, есть история движения. */
+
+/* 15. Pari: страны */
+server.registerTool(
+  'pari_countries',
+  {
+    description: 'Букмекер Pari: список стран с id (для pari_leagues и pari_matches). Кэшируется.',
+    inputSchema: z.object({}),
+  },
+  async () => {
+    try { return pack(await apiGet('/Pari/countries', {}, { cacheKey: 'pari:countries', ttl: CACHE_TTL_MS })); }
+    catch (e) { return errMsg(e); }
+  },
+);
+
+/* 16. Pari: лиги */
+server.registerTool(
+  'pari_leagues',
+  {
+    description: 'Букмекер Pari: список лиг (как на pari.ru). countryId=0 — международные. Пагинация: totalCount/limit.',
+    inputSchema: z.object({
+      countryId: z.number().int().optional().describe('Id страны (0 — международные)'),
+      offset: z.number().int().min(0).optional().describe('Смещение (пагинация)'),
+      limit: z.number().int().min(1).max(1000).optional().describe('Лимит (по умолчанию 1000)'),
+    }),
+  },
+  async (args) => {
+    try {
+      const p = { limit: 1000 };
+      for (const [k, v] of Object.entries(args)) if (v !== undefined) p[k] = v;
+      return pack(await apiGet('/Pari/leagues', p, { cacheKey: `pari:leagues:${JSON.stringify(p)}`, ttl: CACHE_TTL_MS }));
+    } catch (e) { return errMsg(e); }
+  },
+);
+
+/* 17. Pari: лига по id */
+server.registerTool(
+  'pari_league',
+  {
+    description: 'Букмекер Pari: данные конкретной лиги по id.',
+    inputSchema: z.object({ id: z.number().int().describe('Id лиги (pari_leagues или сайт pari.ru)') }),
+  },
+  async ({ id }) => {
+    try { return pack(await apiGet(`/Pari/league/${id}`)); } catch (e) { return errMsg(e); }
+  },
+);
+
+/* 18. Pari: матчи */
+server.registerTool(
+  'pari_matches',
+  {
+    description: `Букмекер Pari: список матчей с коэффициентами. Обязателен хотя бы один фильтр
+(date/dateFrom/dateTo/live/upcoming/leagueId/countryId/teamId). date имеет приоритет над dateFrom/dateTo;
+live+upcoming можно комбинировать. Возвращает totalCount — продолжай пагинацию offset+=limit, пока offset < totalCount
+(максимум limit=1000, но при includeOdds=true максимум 200). Коэффициенты в лёгком формате {id, value} —
+названия исходов расшифровываются через pari_market_types. timezone — UTC-offset в часах (3 = Москва, по умолчанию 3).`,
+    inputSchema: z.object({
+      countryId: z.number().int().optional().describe('Id страны (pari_countries)'),
+      leagueId: z.number().int().optional().describe('Id лиги (pari_leagues)'),
+      date: z.string().optional().describe('Конкретный день YYYY-MM-DD (фильтр по дню UTC, timezone сдвигает границы)'),
+      dateFrom: z.string().optional().describe('Начало диапазона YYYY-MM-DD включительно'),
+      dateTo: z.string().optional().describe('Конец диапазона YYYY-MM-DD включительно'),
+      teamId: z.number().int().optional().describe('Id команды (pari_teams)'),
+      live: z.boolean().optional().describe('Только лайв (статус Live и WillStartSoon)'),
+      upcoming: z.boolean().optional().describe('Только предстоящие (статус NotStarted)'),
+      sortDesc: z.boolean().optional().describe('true — по убыванию времени старта, false — по возрастанию'),
+      includeOdds: z.boolean().optional().describe('Включить актуальные коэффициенты {id, value} (limit ≤ 200)'),
+      showDeleted: z.boolean().optional().describe('Показывать матчи, снятые с линии до начала'),
+      timezone: z.number().int().min(-12).max(12).optional().describe('UTC offset в часах (3 = Москва)'),
+      offset: z.number().int().min(0).optional().describe('Смещение (пагинация)'),
+      limit: z.number().int().min(1).max(1000).optional().describe('Лимит (по умолчанию 100; max 200 при includeOdds)'),
+    }),
+  },
+  async (args) => {
+    try {
+      const p = {};
+      for (const [k, v] of Object.entries(args)) if (v !== undefined) p[k] = v;
+      if (!Object.keys(p).length) return errMsg(new Error('Укажи хотя бы один фильтр: date, live, upcoming, leagueId…'));
+      return pack(await apiGet('/Pari/matches', p));
+    } catch (e) { return errMsg(e); }
+  },
+);
+
+/* 19. Pari: матч по eventId */
+server.registerTool(
+  'pari_match',
+  {
+    description: `Букмекер Pari: самые актуальные данные матча (обновление раз в 3 сек).
+Матч не начался → currentOdds = доматчевые кэфы; идёт → currentOdds = лайв, prematchOdds = последние доматчевые;
+завершён → currentOdds пустое, prematchOdds содержит последние доматчевые. eventId ≠ id матчей SStats!`,
+    inputSchema: z.object({ eventId: z.number().int().describe('Id события на pari.ru (из pari_matches)') }),
+  },
+  async ({ eventId }) => {
+    try { return pack(await apiGet(`/Pari/match/${eventId}`)); } catch (e) { return errMsg(e); }
+  },
+);
+
+/* 20. Pari: история коэффициентов */
+server.registerTool(
+  'pari_odds_history',
+  {
+    description: `Букмекер Pari: история изменения коэффициентов матча (доматчевые и лайв) — движение линии.
+IsBlocked — кэф заблокирован; IsSuspended — заблокирована вся линия (VAR, пенальти, пересчёт); значение 0 — кэф снят с линии.
+Расшифровка outcomeId — через pari_market_types (для каждого периода id свои!).`,
+    inputSchema: z.object({
+      eventId: z.number().int().describe('Id события на pari.ru (из pari_matches)'),
+      oddsType: z.enum(['live', 'prematch']).optional().describe('Тип коэффициентов (по умолчанию оба/все)'),
+    }),
+  },
+  async ({ eventId, oddsType }) => {
+    try {
+      const p = oddsType ? { oddsType } : {};
+      return pack(await apiGet(`/Pari/odds/history/${eventId}`, p));
+    } catch (e) { return errMsg(e); }
+  },
+);
+
+/* 21. Pari: игровые события и статистика матча */
+server.registerTool(
+  'pari_events',
+  {
+    description: `Букмекер Pari: игровые события матча (голы, карточки, замены…) и накопленная статистика
+из потока pari.ru. Обновление раз в 10 сек. Типы событий — справочник pari_event_types.`,
+    inputSchema: z.object({ matchId: z.number().int().describe('Id матча на pari.ru (из pari_matches)') }),
+  },
+  async ({ matchId }) => {
+    try { return pack(await apiGet(`/Pari/events/${matchId}`)); } catch (e) { return errMsg(e); }
+  },
+);
+
+/* 22. Pari: команды */
+server.registerTool(
+  'pari_teams',
+  {
+    description: 'Букмекер Pari: список команд. Укажи id конкретной команды или countryId для списка по стране.',
+    inputSchema: z.object({
+      id: z.number().int().optional().describe('Id конкретной команды'),
+      countryId: z.number().int().optional().describe('Список команд страны'),
+    }),
+  },
+  async (args) => {
+    try {
+      const p = {};
+      for (const [k, v] of Object.entries(args)) if (v !== undefined) p[k] = v;
+      if (!Object.keys(p).length) return errMsg(new Error('Укажи id или countryId'));
+      return pack(await apiGet('/Pari/teams', p));
+    } catch (e) { return errMsg(e); }
+  },
+);
+
+/* 23. Pari: справочник маркетов и исходов */
+server.registerTool(
+  'pari_market_types',
+  {
+    description: `Букмекер Pari: полный справочник маркетов и исходов — расшифровка outcomeId из коэффициентов
+и истории. Для каждого периода (1-й тайм, 2-й тайм) outcomeId свои. Кэшируется надолго.`,
+    inputSchema: z.object({}),
+  },
+  async () => {
+    try { return pack(await apiGet('/Pari/odds/market-types', {}, { cacheKey: 'pari:market-types', ttl: 60 * 60_000 })); }
+    catch (e) { return errMsg(e); }
+  },
+);
+
+/* 24. Pari: справочник типов игровых событий */
+server.registerTool(
+  'pari_event_types',
+  {
+    description: 'Букмекер Pari: справочник типов игровых событий (для pari_events). Кэшируется надолго.',
+    inputSchema: z.object({}),
+  },
+  async () => {
+    try { return pack(await apiGet('/Pari/events/types', {}, { cacheKey: 'pari:event-types', ttl: 60 * 60_000 })); }
+    catch (e) { return errMsg(e); }
+  },
+);
+
 process.on('uncaughtException', (e) => console.error('[sstats] uncaught:', e?.stack || e));
 process.on('unhandledRejection', (e) => console.error('[sstats] unhandled:', e?.stack || e));
 
