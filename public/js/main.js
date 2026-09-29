@@ -9,12 +9,20 @@ import { createEvents } from './events.js';
 import { createProfile } from './profile.js';
 
 /* ── состояние ── */
+// миграция: прежний дефолт «Спрашивать» → полный доступ (однократно;
+// выбор, сделанный позже в настройках, сохраняется как есть)
+if (localStorage.getItem('sc_permMode') === 'default') {
+  localStorage.setItem('sc_permMode', 'bypassPermissions');
+}
+
 const S = {
   ws: null,
   sessionId: null,
   busy: false,
   model: localStorage.getItem('sc_model') || 'deepseek-v4-flash',
-  permMode: localStorage.getItem('sc_permMode') || 'default',
+  // «Режим прав» убран из-под композера (живёт в настройках движка):
+  // по умолчанию — всегда полный доступ
+  permMode: localStorage.getItem('sc_permMode') || 'bypassPermissions',
   includeUser: localStorage.getItem('sc_includeUser') === '1',
   cost: 0,
   tokensIn: 0,
@@ -474,34 +482,7 @@ $('#stopBtn').addEventListener('click', () => {
   toast('Прерываю…', 'warn', 1800);
 });
 
-const permSel = $('#permMode');
-permSel.value = S.permMode;
-permSel.classList.toggle('danger', S.permMode === 'bypassPermissions');
-let permBootDone = false; // Chrome при перезагрузке восстанавливает форму и кидает change — игнорируем
-setTimeout(() => { permBootDone = true; }, 800);
-permSel.addEventListener('change', () => {
-  if (!permBootDone) {
-    permSel.value = S.permMode;
-    return;
-  }
-  if (permSel.value === 'bypassPermissions' && S.permMode !== 'bypassPermissions') {
-    const ok = confirm('РЕЖИМ ПОЛНОГО ДОСТУПА (аналог claude --dangerously-skip-permissions):\nагент будет выполнять любые действия — запись файлов, команды — без подтверждений.\n\nВключить?');
-    if (!ok) {
-      permSel.value = S.permMode;
-      return;
-    }
-    toast('Полный доступ включён — агент действует без подтверждений', 'warn', 5000);
-  }
-  S.permMode = permSel.value;
-  permSel.classList.toggle('danger', S.permMode === 'bypassPermissions');
-  localStorage.setItem('sc_permMode', S.permMode);
-});
-const includeUserCb = $('#includeUser');
-includeUserCb.checked = S.includeUser;
-includeUserCb.addEventListener('change', () => {
-  S.includeUser = includeUserCb.checked;
-  localStorage.setItem('sc_includeUser', S.includeUser ? '1' : '');
-});
+/* Режим прав и глобальный конфиг управляются в «Настройках движка» (settings.js) */
 
 /* ══════════ подсказки-чипсы ══════════ */
 $$('.chip[data-prompt]').forEach((chip) => {

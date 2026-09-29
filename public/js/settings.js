@@ -156,7 +156,6 @@ export function createSettings({ S, updateTablo, updateEngineInfo }) {
     pane.querySelector('#setIncludeUser').addEventListener('change', (e) => {
       S.includeUser = e.target.checked;
       localStorage.setItem('sc_includeUser', S.includeUser ? '1' : '');
-      $('#includeUser').checked = S.includeUser;
     });
     const permSel = pane.querySelector('#setPermMode');
     permSel.value = S.permMode;
@@ -168,9 +167,7 @@ export function createSettings({ S, updateTablo, updateEngineInfo }) {
         }
       }
       S.permMode = e.target.value;
-      const main = $('#permMode');
-      main.value = S.permMode;
-      main.classList.toggle('danger', S.permMode === 'bypassPermissions');
+      localStorage.setItem('sc_permMode', S.permMode);
     });
   }
 

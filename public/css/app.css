@@ -1621,11 +1621,12 @@ html, body { overflow-x: clip; }
     font-size: 16px; min-height: 44px; padding: 8px 12px;
   }
 
-  /* «Режим прав»: не обрезать значение — строка одна, места хватает;
-     второй ряд (чекбокс конфига) не должен прятаться под bottom-nav */
-  .under-composer .uc-select { max-width: none; flex: 1 1 auto; }
-  .composer-wrap { padding-bottom: calc(118px + var(--sab)); }
-  .toasts { bottom: calc(158px + var(--sab)); }
+  /* «Режим прав» и глобальный конфиг ушли в настройки движка —
+     под композером пусто; резерв = высота bottom-nav */
+  .under-composer { margin: 0; }
+  .under-composer:empty, .under-composer .uc-session[hidden] { display: none; }
+  .composer-wrap { padding-bottom: calc(76px + var(--sab)); }
+  .toasts { bottom: calc(116px + var(--sab)); }
 
   /* ошибка загрузки: кнопка «Повторить» рядом с текстом */
   .events-notice button { min-height: 40px; padding: 8px 16px; margin: 6px 0 0 10px; }
