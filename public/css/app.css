@@ -1211,6 +1211,9 @@ body.events-open .composer-wrap { display: none; }
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .field label { font-family: var(--f-mono); font-size: 9.5px; letter-spacing: .2em; text-transform: uppercase; color: var(--dim); }
+/* селект на всю ширину поля: длинная выбранная опция
+   («Полный доступ — … (—dangerously-skip-permissions)») иначе распирает модалку */
+.field select { width: 100%; text-overflow: ellipsis; }
 .field input[type="text"], .field input[type="password"], .field input[type="email"], .field input[type="tel"], .field select, .field textarea {
   background: #0c1310; border: 1px solid var(--line-strong); border-radius: 9px;
   color: var(--chalk); font-size: 13.5px; padding: 9.5px 12px; outline: none;
@@ -1242,6 +1245,8 @@ body.events-open .composer-wrap { display: none; }
 .btn-danger:hover { background: rgba(255, 90, 90, .1); }
 
 .seg-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); padding: 0 20px; flex: none; }
+/* вкладки внутри модалки: прижаты к краям шапки (паддинги компенсируются) */
+.seg-tabs-inmodal { margin: -18px -20px 4px; }
 .seg-tab {
   background: none; border: none; color: var(--faint); position: relative;
   font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase;
@@ -1630,4 +1635,17 @@ html, body { overflow-x: clip; }
 
   /* ошибка загрузки: кнопка «Повторить» рядом с текстом */
   .events-notice button { min-height: 40px; padding: 8px 16px; margin: 6px 0 0 10px; }
+
+  /* модалки: настройки движка и прочие контентные */
+  .modal-body { overflow-x: hidden; }           /* страховка от распирания контентом */
+  .seg-tabs-inmodal { margin: -14px -14px 6px; }
+  .seg-tab { min-height: 44px; }
+  .modal-foot .btn-primary, .modal-foot .btn-secondary, .modal-foot .btn-danger { min-height: 44px; }
+  .modal-foot { justify-content: stretch; }
+  .modal-foot .btn-primary { flex: 1; width: 100%; }  /* сабмит на всю ширину */
+  .engine-info { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .field select { min-height: 44px; }
+  .info-v { word-break: break-all; }            /* путь workspace переносится */
+  .check-row input { width: 18px; height: 18px; margin-top: 1px; }
+}
 }

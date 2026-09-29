@@ -10,7 +10,7 @@ export function createSettings({ S, updateTablo, updateEngineInfo }) {
   async function openSettings() {
     const wrap = document.createElement('div');
     wrap.innerHTML = `
-      <div class="seg-tabs" style="margin:-18px -20px 4px; padding:0 20px;">
+      <div class="seg-tabs seg-tabs-inmodal">
         <button class="seg-tab active" data-tab="persona">Персона</button>
         <button class="seg-tab" data-tab="perms">Права</button>
         <button class="seg-tab" data-tab="engine">Движок</button>
