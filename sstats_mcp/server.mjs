@@ -23,7 +23,6 @@ import { fileURLToPath } from 'node:url';
 
 const BASE = 'https://api.sstats.net';
 const MAX_BODY = 400_000;         // обрезка гигантских ответов (GameFull)
-const MIN_GAP_MS = 120;           // мягкий троттлинг (лимиты API: 30/мин/IP без ключа)
 const CACHE_TTL_MS = 10 * 60_000; // справочники (лиги, букмекеры) — 10 минут
 
 /* ── ключ ── */
@@ -42,9 +41,8 @@ if (!API_KEY) {
   console.error('[sstats] ВАЖНО: API-ключ не найден. Положи его в data/sstats-key.json {"apikey":"…"} или задай env SSTATS_API_KEY');
 }
 
-/* ── кэш и троттлинг ── */
+/* ── кэш, троттлинг, ретраи ── */
 const cache = new Map();
-const throttle = { last: 0 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** Маскируем ключ, где бы он ни встретился: в JSON-ответах, ошибках, URL. */
@@ -56,42 +54,73 @@ function scrub(s) {
     .replace(SCRUB_QUERY, '$1***');
 }
 
+/* Модель шлёт пачки параллельных tool-вызовов — без очереди они бьют в API
+   одновременно и ловят сбросы/лимиты. Сериализуем через цепочку обещаний. */
+let chain = Promise.resolve();
+const MIN_GAP_MS = 120;
+const throttle = { last: 0 };
+
+const RETRYABLE = /fetch failed|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|socket|terminated|HTTP 429|HTTP 5\d\d|таймаут|Сеть/i;
+
 async function apiGet(p, params = {}, { cacheKey = null, ttl = 0 } = {}) {
   if (cacheKey) {
     const hit = cache.get(cacheKey);
     if (hit && hit.expires > Date.now()) return hit.data;
   }
-  const wait = MIN_GAP_MS - (Date.now() - throttle.last);
-  if (wait > 0) await sleep(wait);
-  throttle.last = Date.now();
+  const attempt = async () => {
+    const wait = MIN_GAP_MS - (Date.now() - throttle.last);
+    if (wait > 0) await sleep(wait);
+    throttle.last = Date.now();
 
-  // SStats принимает ключ ТОЛЬКО в query-строке (OpenAPI: apiKey in query).
-  // Сам URL нигде не логируется, а в ошибки ключ не попадает (scrub ниже).
-  const q = new URLSearchParams({ ...params, apikey: API_KEY });
-  const url = `${BASE}${p}?${q}`;
-  let res;
-  try {
-    res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
-  } catch (e) {
-    throw new Error(`Сеть: не удалось обратиться к SStats (${scrub(e.message)})`);
-  }
-  const text = await res.text();
-  if (!res.ok) {
-    let detail = '';
+    // SStats принимает ключ ТОЛЬКО в query-строке (OpenAPI: apiKey in query).
+    // Сам URL нигде не логируется, а в ошибки ключ не попадает (scrub ниже).
+    const q = new URLSearchParams({ ...params, apikey: API_KEY });
+    const url = `${BASE}${p}?${q}`;
+    let res;
     try {
-      const j = JSON.parse(text);
-      detail = j.error?.message || j.message || j.status || '';
-    } catch { /* тело не JSON */ }
-    throw new Error(`SStats HTTP ${res.status}${detail ? `: ${scrub(detail)}` : ''}`);
-  }
-  let data;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    throw new Error(`SStats: не-JSON ответ (${scrub(text.slice(0, 120))})`);
-  }
-  if (cacheKey && ttl > 0) cache.set(cacheKey, { expires: Date.now() + ttl, data });
-  return data;
+      res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+    } catch (e) {
+      throw new Error(`Сеть: не удалось обратиться к SStats (${scrub(e.message)})`);
+    }
+    const text = await res.text();
+    if (!res.ok) {
+      let detail = '';
+      try {
+        const j = JSON.parse(text);
+        detail = j.error?.message || j.message || j.status || '';
+      } catch { /* тело не JSON */ }
+      throw new Error(`SStats HTTP ${res.status}${detail ? `: ${scrub(detail)}` : ''}`);
+    }
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw new Error(`SStats: не-JSON ответ (${scrub(text.slice(0, 120))})`);
+    }
+    return data;
+  };
+
+  // 3 попытки с нарастающей задержкой — sstats.net периодически сбрасывает
+  // соединения даже по IPv4; повтор того же запроса обычно проходит
+  const run = async () => {
+    let lastErr;
+    for (let i = 0; i < 3; i++) {
+      try {
+        const data = await attempt();
+        if (cacheKey && ttl > 0) cache.set(cacheKey, { expires: Date.now() + ttl, data });
+        return data;
+      } catch (e) {
+        lastErr = e;
+        if (i < 2 && RETRYABLE.test(String(e?.message))) await sleep(400 * 2 ** i + Math.random() * 200);
+        else break;
+      }
+    }
+    throw lastErr;
+  };
+
+  const queued = chain.then(run, run);
+  chain = queued.catch(() => {});
+  return queued;
 }
 
 /** Ответы обёрнуты в ApiResponse {status, count, data}; часть эндпоинтов отдаёт сырой массив. */
