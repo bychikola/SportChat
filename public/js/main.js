@@ -64,10 +64,7 @@ function plural(n, one, few, many) {
 }
 
 function updateEngineInfo() {
-  $('#capEngine').textContent = `СПОРТЧАТ AI${S.init?.version ? ` · ${S.init.version}` : ''}`;
   const n = S.mcpServers.length;
-  $('#capMcp').textContent = n === 0 ? 'нет серверов' : `${n} ${plural(n, 'сервер', 'сервера', 'серверов')}`;
-  $('#capSkills').textContent = String(S.skills.length);
   const pCount = (S.pluginSelection || []).length;
   $('#sbCounts').textContent = `mcp:${n} · skills:${S.skills.length}${pCount ? ` · plugins:${pCount}` : ''}`;
 }
