@@ -1208,6 +1208,44 @@ body.events-open .composer-wrap { display: none; }
 .modal-body { padding: 18px 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
 .modal-foot { display: flex; justify-content: flex-end; gap: 9px; padding: 14px 20px; border-top: 1px solid var(--line); flex: none; }
 
+/* ── карточка сигнала / экспресса: кастомная таблица + решение пользователя ── */
+.signal-card {
+  margin: 10px 0 2px; padding: 0; overflow: hidden;
+  background: linear-gradient(170deg, var(--pitch-2), var(--pitch-1));
+  box-shadow: inset 0 0 0 1px rgba(255, 180, 84, .35), var(--shadow-pop);
+}
+.sig-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px; border-bottom: 1px solid var(--line);
+  font-family: var(--f-mono); font-size: 11px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--flut);
+  background: rgba(255, 180, 84, .07);
+}
+.sig-head svg { width: 15px; height: 15px; flex: none; }
+.sig-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.sig-table th, .sig-table td { padding: 8px 14px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.sig-table tr:last-child th, .sig-table tr:last-child td { border-bottom: none; }
+.sig-table th {
+  font-family: var(--f-mono); font-size: 9px; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--dim); font-weight: 400;
+  width: 110px; white-space: nowrap;
+}
+.sig-table td { color: var(--chalk); min-width: 0; }
+.sig-table td.sig-bet { font-weight: 600; color: var(--flut); }
+.sig-table td.sig-odds { font-family: var(--f-mono); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sig-table thead th { color: var(--faint); border-bottom: 1px solid var(--line-strong); }
+.sig-table tfoot td { font-weight: 700; color: var(--flut); font-family: var(--f-mono); }
+.sig-actions {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 10px 14px 12px; border-top: 1px solid var(--line);
+  background: rgba(4, 7, 5, .35);
+}
+.sig-actions .btn-primary, .sig-actions .btn-secondary { padding: 9px 16px; }
+.sig-status { flex-basis: 100%; font-size: 12px; color: var(--mint); }
+.signal-card.is-declined .sig-status { color: var(--faint); }
+.signal-card.is-accepted { box-shadow: inset 0 0 0 1px rgba(80, 220, 150, .45), var(--shadow-pop); }
+.signal-card.is-declined { opacity: .62; box-shadow: inset 0 0 0 1px var(--line), var(--shadow-pop); }
+
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .field label { font-family: var(--f-mono); font-size: 9.5px; letter-spacing: .2em; text-transform: uppercase; color: var(--dim); }
@@ -1643,6 +1681,12 @@ html, body { overflow-x: clip; }
   .modal-foot .btn-primary, .modal-foot .btn-secondary, .modal-foot .btn-danger { min-height: 44px; }
   .modal-foot { justify-content: stretch; }
   .modal-foot .btn-primary { flex: 1; width: 100%; }  /* сабмит на всю ширину */
+
+  /* карточка сигнала/экспресса: цели 44px, таблица не уползает */
+  .sig-actions .btn-primary, .sig-actions .btn-secondary { flex: 1 1 auto; min-height: 44px; }
+  .sig-table th { width: 92px; padding: 7px 10px; }
+  .sig-table td { padding: 7px 10px; }
+  .sig-head { padding: 9px 12px; font-size: 10px; }
   .engine-info { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .field select { min-height: 44px; }
   .info-v { word-break: break-all; }            /* путь workspace переносится */

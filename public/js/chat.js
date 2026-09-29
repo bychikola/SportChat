@@ -285,7 +285,42 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
     scrollDown();
   }
 
-  /* ── сигнал из финального текста (СИГНАЛ: key=… | …) ── */
+  /* ── решение по ставке из финального текста (СИГНАЛ / ЭКСПРЕСС) ── */
+  const DECIDE_LOG = 'sc_signalDecisions';
+
+  function logDecision(entry) {
+    try {
+      const arr = JSON.parse(localStorage.getItem(DECIDE_LOG) || '[]');
+      arr.unshift({ ...entry, at: new Date().toISOString() });
+      localStorage.setItem(DECIDE_LOG, JSON.stringify(arr.slice(0, 200)));
+    } catch { /* приватный режим — журнал не критичен */ }
+  }
+
+  function decideBar({ acceptLabel, onAccept, skipLabel = 'Пропускаю' }) {
+    const bar = document.createElement('div');
+    bar.className = 'sig-actions';
+    bar.innerHTML = `
+      <button class="btn-primary notch-sm sig-accept">${esc(acceptLabel)}</button>
+      <button class="btn-secondary notch-sm sig-skip">${esc(skipLabel)}</button>
+      <div class="sig-status"></div>`;
+    const [acc, skip, status] = ['sig-accept', 'sig-skip', 'sig-status'].map((c) => bar.querySelector(`.${c}`));
+    const decide = (accepted, note) => {
+      acc.disabled = skip.disabled = true;
+      bar.closest('.signal-card').classList.add(accepted ? 'is-accepted' : 'is-declined');
+      status.innerHTML = accepted ? `✓ ${note}` : `✗ ${note}`;
+      status.hidden = false;
+      scrollDown(true);
+    };
+    acc.addEventListener('click', async () => {
+      acc.disabled = true;
+      acc.textContent = 'Записываю…';
+      try { await onAccept(); } catch (e) { acc.disabled = false; acc.textContent = acceptLabel; toast(e.message, 'err'); return; }
+      decide(true, 'принято');
+    });
+    skip.addEventListener('click', () => decide(false, 'пропущено'));
+    return { bar };
+  }
+
   function extractSignal(cur) {
     const text = [...cur.bubble.querySelectorAll('.md')].map((el) => el.textContent).join('\n');
     const line = /СИГНАЛ:\s*([^\n]+)/.exec(text);
@@ -298,25 +333,25 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
     }
     if (!fields.gameid || !fields.key || !fields.pick) return;
 
+    const row = (k, v, cls = '') => `<tr><th>${k}</th><td class="${cls}">${v}</td></tr>`;
+    const conf = (fields.уверенность || '').toLowerCase();
+    const confCls = conf.includes('высок') ? 'ok' : conf.includes('низк') ? 'warn' : 'run';
     const card = document.createElement('div');
     card.className = 'signal-card notch';
     card.innerHTML = `
-      <div class="sig-head">${icon('bolt')} Сигнал — сохранить в трекер точности?</div>
-      <div class="sig-body">
-        <div><span>Матч</span><b>${esc(fields.матч || '—')}</b></div>
-        <div><span>Лига</span><b>${esc(fields.лига || '—')}</b></div>
-        <div><span>Рынок</span><b>${esc(fields.рынок || '—')}</b></div>
-        <div><span>Ставка</span><b>${esc(fields.pick)}</b></div>
-        ${fields.кэф ? `<div><span>Кэф</span><b>${esc(fields.кэф)}</b></div>` : ''}
-        ${fields.уверенность ? `<div><span>Уверенность</span><b>${esc(fields.уверенность)}</b></div>` : ''}
-      </div>
-      <button class="btn-primary notch-sm sig-save">Сохранить как сигнал</button>`;
+      <div class="sig-head">${icon('bolt')} СИГНАЛ — решение по ставке</div>
+      <table class="sig-table">
+        ${row('Матч', esc(fields.матч || '—'))}
+        ${fields.лига ? row('Лига', esc(fields.лига)) : ''}
+        ${row('Рынок', esc(fields.рынок || '—'))}
+        ${row('Ставка', esc(fields.pick), 'sig-bet')}
+        ${fields.кэф ? row('Кэф', esc(fields.кэф), 'sig-odds') : ''}
+        ${fields.уверенность ? row('Уверенность', `<span class="st st-${confCls}">${esc(fields.уверенность)}</span>`) : ''}
+      </table>`;
 
-    card.querySelector('.sig-save').addEventListener('click', async (e) => {
-      const b = e.currentTarget;
-      b.disabled = true;
-      b.textContent = 'Сохраняю…';
-      try {
+    const { bar } = decideBar({
+      acceptLabel: 'Принимаю ставку',
+      onAccept: async () => {
         await api('/signals', { method: 'POST', body: {
           gameId: fields.gameid,
           match: fields.матч || '',
@@ -328,17 +363,67 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
           confidence: fields.уверенность || '',
           date: fields.дата || '',
         }});
-        b.textContent = 'Сохранено ✓';
-        toast('Сигнал сохранён — точность посчитается после матча', 'ok', 3600);
-      } catch (err) {
-        b.disabled = false;
-        b.textContent = 'Сохранить как сигнал';
-        toast(err.message, 'err');
-      }
+        logDecision({ type: 'signal', match: fields.матч || '', market: fields.рынок || '', pick: fields.pick, odds: fields.кэф || null, accepted: true });
+        toast('Сигнал принят — точность посчитается после матча', 'ok', 3600);
+      },
     });
-
+    bar.querySelector('.sig-skip').addEventListener('click', () => {
+      logDecision({ type: 'signal', match: fields.матч || '', market: fields.рынок || '', pick: fields.pick, odds: fields.кэф || null, accepted: false });
+    });
+    card.appendChild(bar);
     cur.wrap.appendChild(card);
     scrollDown(true);
+  }
+
+  /* Экспресс: кастомная таблица ног вместо сырого markdown-списка */
+  function extractExpress(cur) {
+    for (const md of cur.bubble.querySelectorAll('.md')) {
+      const head = [...md.querySelectorAll(':scope > p')].find((el) => /^\s*ЭКСПРЕСС\s+[\d.,]+\s*x/i.test(el.textContent || ''));
+      if (!head) continue;
+      const legsOl = head.nextElementSibling;
+      if (!legsOl || !/^(OL|UL)$/.test(legsOl.tagName)) continue;
+      const legs = [...legsOl.querySelectorAll(':scope > li')].map((li) => {
+        const m = /^\s*(?:\d+[.)]\s*)?(.+?)\s+—\s+(.+?)\s+@\s*([\d.,]+)/.exec(li.textContent.trim());
+        return m ? { match: m[1], market: m[2], odds: parseFloat(m[3].replace(',', '.')) } : null;
+      }).filter(Boolean);
+      if (legs.length < 2) continue;
+
+      const headOdds = parseFloat((/ЭКСПРЕСС\s+([\d.,]+)\s*x/i.exec(head.textContent) || [])[1]?.replace(',', '.') || 0);
+      const odds = headOdds || legs.reduce((a, l) => a * l.odds, 1);
+      const mdText = md.textContent;
+      const prob = (/вероятност\w+\s+захода[^%]*?(\d+(?:[.,]\d+)?)\s*%/i.exec(mdText) || [])[1];
+
+      const card = document.createElement('div');
+      card.className = 'signal-card express notch';
+      card.innerHTML = `
+        <div class="sig-head">${icon('bolt')} ЭКСПРЕСС ${odds.toFixed(2).replace('.', '.')}x${prob ? ` · вероятность ~${esc(prob)}%` : ''} — решение</div>
+        <table class="sig-table">
+          <thead><tr><th>№</th><th>Матч</th><th>Рынок</th><th>Кэф</th></tr></thead>
+          <tbody>
+            ${legs.map((l, i) => `<tr><td>${i + 1}</td><td>${esc(l.match)}</td><td>${esc(l.market)}</td><td class="sig-odds">${l.odds}</td></tr>`).join('')}
+          </tbody>
+          <tfoot><tr><td colspan="3">Итоговый коэффициент</td><td class="sig-odds">${odds.toFixed(2)}</td></tr></tfoot>
+        </table>`;
+
+      const { bar } = decideBar({
+        acceptLabel: 'Принимаю экспресс',
+        onAccept: async () => {
+          logDecision({ type: 'express', legs, odds, probability: prob || null, accepted: true });
+          toast('Экспресс принят — запись в журнале решений', 'ok', 3600);
+        },
+      });
+      bar.querySelector('.sig-skip').addEventListener('click', () => {
+        logDecision({ type: 'express', legs, odds, probability: prob || null, accepted: false });
+      });
+      card.appendChild(bar);
+
+      // сырой список ног уходит из текста — остаётся только карточка
+      legsOl.remove();
+      head.remove();
+      cur.wrap.appendChild(card);
+      scrollDown(true);
+      break; // один экспресс на ответ
+    }
   }
 
   function finishRunMeta(m) {
@@ -374,6 +459,7 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
     cur.wrap.appendChild(meta);
 
     try { extractSignal(cur); } catch { /* некритично */ }
+    try { extractExpress(cur); } catch { /* некритично */ }
   }
 
   /* ── обработка событий агента ── */
