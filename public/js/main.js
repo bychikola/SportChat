@@ -212,6 +212,12 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
   navigator.serviceWorker.register('/sw.js').catch(() => { /* без SW сайт тоже работает */ });
 }
 
+// live-панель: крестик (мобильный bottom-sheet)
+$('#livePanel .lp-close')?.addEventListener('click', () => {
+  document.body.classList.remove('live-open');
+  $('#livePanel').hidden = true;
+});
+
 // подсказка установки на iPhone (Safari, не standalone)
 (function pwaHint() {
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);

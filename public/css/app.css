@@ -387,6 +387,20 @@ body.live-open .rail { display: none; }   /* rail уступает место р
 .lp-bar i { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--mint), var(--go)); transition: width .4s ease; }
 .lp-conf b { font-family: var(--f-mono); font-size: 12px; color: var(--go); }
 
+/* источники и действия (Фаза 5) */
+.lp-source, .lp-action {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12.5px; color: var(--dim); line-height: 1.35;
+}
+.lp-source svg, .lp-action svg { width: 14px; height: 14px; flex: none; color: var(--faint); }
+.lp-source.done { color: var(--chalk); }
+.lp-source.done svg { color: var(--go); }
+.lp-action .lp-dur { margin-left: auto; font-family: var(--f-mono); font-size: 10.5px; color: var(--faint); flex: none; }
+.lp-action span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lp-q { display: block; font-size: 13px; font-weight: 600; line-height: 1.4; }
+.lp-match span.lp-q { margin-bottom: 2px; }
+.lp-head .lp-close { display: none; }
+
 /* ═══════════ ЛЕНТА ПРОГНОЗОВ (Фаза 4) ═══════════ */
 .feed-view { display: none; flex-direction: column; flex: 1; min-height: 0; }
 body.feed-open .feed-view { display: flex; }
@@ -1870,6 +1884,20 @@ html, body { overflow-x: clip; }
   .sig-table td { padding: 7px 10px; }
   .sig-head { padding: 9px 12px; font-size: 10px; }
   .rtab { min-height: 44px; }              /* табы панели инструментов */
+
+  /* live-панель: bottom-sheet поверх ленты/чата */
+  .live-panel {
+    position: fixed; left: 0; right: 0; bottom: 0; top: auto;
+    max-height: 72dvh; z-index: 96;
+    border-left: none; border-top: 1px solid var(--line-strong);
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 -18px 50px -12px rgba(0, 0, 0, .7);
+    padding-bottom: calc(66px + var(--sab)); /* не под bottom-nav */
+  }
+  body.live-open #app { grid-template-columns: 266px minmax(0, 1fr) 0px; }
+  .lp-head .lp-close { display: grid; place-items: center; margin-left: auto; width: 36px; height: 36px; background: none; border: none; color: var(--faint); }
+  .lp-head .lp-close svg { width: 16px; height: 16px; }
+  .lp-head .st { margin-left: 0; }
 
   /* лента на мобиле: таблица → карточки */
   .feed-table { display: none; }

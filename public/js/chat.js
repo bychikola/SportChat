@@ -2,6 +2,7 @@
 
 import { $, esc, icon, toolIcon, toolSummary, fmtCost, fmtInt, timeStr, toast } from './util.js';
 import { api } from './api.js';
+import { lpBegin, lpToolStart, lpToolDetail, lpToolEnd, lpText, lpDone, lpConfidenceFromWord, setConf } from './livepanel.js';
 import { mdToHtml } from './md.js';
 
 const PERM_TIMEOUT_MS = 180_000;
@@ -184,6 +185,7 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
     c.tools.set(id, t);
     pendingSegs.push({ kind: 'tool', id });
     rail.pushEpisode(t);
+    lpToolStart(id, name);
     scrollDown();
     return t;
   }
@@ -332,6 +334,7 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
       fields[p[1].trim().toLowerCase()] = p[2].trim();
     }
     if (!fields.gameid || !fields.key || !fields.pick) return;
+    lpConfidenceFromWord(fields.уверенность);
 
     const row = (k, v, cls = '') => `<tr><th>${k}</th><td class="${cls}">${v}</td></tr>`;
     const conf = (fields.уверенность || '').toLowerCase();
@@ -417,6 +420,7 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
       const odds = headOdds || legs.reduce((a, l) => a * l.odds, 1);
       const mdText = md.textContent;
       const prob = (/вероятност\w+\s+захода[^%]*?(\d+(?:[.,]\d+)?)\s*%/i.exec(mdText) || [])[1];
+      if (prob) setConf(parseFloat(prob.replace(',', '.')), 'вероятность захода');
 
       const card = document.createElement('div');
       card.className = 'signal-card express notch';
@@ -515,6 +519,7 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
           entry = [...pendingSegs].reverse().find((s) => s.kind === 'text') || pushTextSegment(msg.index);
         }
         appendStreamText(entry, msg.v);
+        lpText(entry.buf);
         break;
       }
       case 'thinking_delta': {
@@ -535,6 +540,7 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
           try {
             t.inputObj = JSON.parse(t.inputRaw);
             t.card.querySelector('.tc-summary').textContent = toolSummary(t.name, t.inputObj) || '…';
+            lpToolDetail(t.id, t.inputObj);
           } catch { /* json ещё не собран */ }
         }
         break;
@@ -554,6 +560,7 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
           setToolStatus(t, msg.isError ? 'err' : 'ok');
           if (t.card.classList.contains('open')) showToolResult(t, t.result, msg.isError);
         }
+        lpToolEnd(msg.id, !msg.isError);
         rail.updateEpisode(t || { id: msg.id, status: msg.isError ? 'err' : 'ok' });
         if (S.busy) setStatus('busy', 'ДУМАЕТ');
         break;
@@ -617,6 +624,7 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
       cur.wrap.appendChild(note);
     }
     setStatus('ready', 'ГОТОВ');
+    lpDone(stopped);
     scrollDown();
   }
 
@@ -664,6 +672,7 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
     autoGrow();
     addUserBubble(text);
     beginRun();
+    lpBegin(text);
     S.busy = true;
     $('#sendBtn').disabled = true;
     $('#stopBtn').hidden = false;
