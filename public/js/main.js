@@ -132,6 +132,58 @@ chat.bindSessionStarted((init) => {
 const eventsView = createEvents({ chat });
 const profile = createProfile();
 
+/* ══════════ Сайдбар: разделы (концепт-редизайн) + бейджи ══════════ */
+document.querySelectorAll('.side-nav .nav-item').forEach((b) => {
+  b.addEventListener('click', () => {
+    const nav = b.dataset.nav;
+    if (nav === 'events') { eventsView.open(); document.body.classList.remove('side-open'); }
+    if (nav === 'tracker') { eventsView.openTracker(); document.body.classList.remove('side-open'); }
+    if (nav === 'fav') {
+      // избранное живёт на странице матчей — включаем фильтр «только избранное»
+      localStorage.setItem('sc_favOnly', '1');
+      eventsView.open();
+      document.body.classList.remove('side-open');
+    }
+    if (nav === 'stats') toast('Статистика появится в ближайшем обновлении', 'info', 2600);
+  });
+});
+
+function refreshSideBadges() {
+  const navFav = $('#navFav');
+  if (navFav) {
+    let fav = 0;
+    try {
+      if (JSON.parse(localStorage.getItem('sc_favTeam') || 'null')) fav++;
+      if (JSON.parse(localStorage.getItem('sc_favLeague') || 'null')) fav++;
+    } catch { /* битый JSON — не страшно */ }
+    navFav.hidden = fav === 0;
+    navFav.textContent = fav;
+  }
+  const navExpress = $('#navExpress');
+  if (navExpress) {
+    api('/signals').then((j) => {
+      const n = j?.stats?.pending ?? 0;
+      navExpress.hidden = !n;
+      navExpress.textContent = n;
+    }).catch(() => { /* без бейджа */ });
+  }
+}
+refreshSideBadges();
+
+/* глобальный поиск в шапке: Enter — текст уходит в разбор */
+$('#globalSearch')?.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  const q = e.target.value.trim();
+  if (!q) return;
+  const input = $('#input');
+  input.value = q;
+  input.dispatchEvent(new Event('input'));
+  eventsView.close();
+  document.body.classList.remove('side-open');
+  input.focus();
+  e.target.value = '';
+});
+
 /* ══════════ PWA: нижняя навигация (мобильные) + service worker ══════════ */
 const bottomNav = $('#bottomNav');
 if (bottomNav) {
@@ -413,12 +465,16 @@ async function selectModel(provider, model) {
 /** Подпись на табло: выбранная модель для конфига или «модель · источник». */
 function updateTabloModelLabel() {
   const act = S.providersData?.active || { provider: 'config', model: '' };
+  let label;
   if (act.provider && act.provider !== 'config') {
     modelBtn.textContent = `${act.model || '…'} · ${S.providersData?.providers?.[act.provider]?.label || act.provider}`;
-    return modelBtn.textContent;
+    label = modelBtn.textContent;
+  } else {
+    label = MODELS.find((m) => m.v === S.model)?.label || S.model;
+    modelBtn.textContent = label;
   }
-  const label = MODELS.find((m) => m.v === S.model)?.label || S.model;
-  modelBtn.textContent = label;
+  const sm = $('#sideModel');
+  if (sm) sm.textContent = label;
   return label;
 }
 

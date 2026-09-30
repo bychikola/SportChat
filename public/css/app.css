@@ -23,6 +23,12 @@
   --sky: #7fb5ff;
   --ink-on-flut: #1d1405;
 
+  /* редизайн-токены (PLAN-REDESIGN §1): статусные цвета концепта */
+  --go: #22c55e;            /* success: value-бейджи, СЕГОДНЯ, ПРИНЯТЬ, LIVE */
+  --go-dim: rgba(34, 197, 94, .14);
+  --danger: #ef4444;        /* ОТКЛОНИТЬ, риск */
+  --danger-dim: rgba(239, 68, 68, .12);
+
   --f-display: 'Russo One', 'Arial Black', sans-serif;
   --f-body: 'Golos Text', 'Segoe UI', system-ui, sans-serif;
   --f-mono: 'JetBrains Mono', 'Consolas', monospace;
@@ -299,6 +305,87 @@ body.rail-hidden .rail { overflow: hidden; border-left: none; }
   min-height: 0;
 }
 .side-top { display: flex; align-items: center; gap: 8px; padding: 14px 14px 6px; }
+
+/* разделы сайдбара (концепт): Матчи / Экспрессы / Статистика / Избранное */
+.side-nav { display: flex; flex-direction: column; gap: 2px; padding: 6px 10px 2px; }
+.nav-item {
+  display: flex; align-items: center; gap: 11px;
+  padding: 9px 10px; border: none; border-radius: 10px;
+  background: none; color: var(--dim); text-align: left; width: 100%;
+  transition: background .14s ease, color .14s ease;
+}
+.nav-item:hover { background: var(--pitch-2); color: var(--chalk); }
+.nav-item:hover svg { color: var(--flut); }
+.nav-item:disabled { opacity: .55; cursor: default; }
+.nav-item:disabled:hover { background: none; color: var(--dim); }
+.nav-item svg { width: 17px; height: 17px; color: var(--faint); flex: none; transition: color .14s ease; }
+.nv-t { display: flex; flex-direction: column; gap: 0; min-width: 0; flex: 1 1 auto; font-size: 13px; font-weight: 500; line-height: 1.25; }
+.nv-t small { font-size: 10px; color: var(--faint); font-weight: 400; }
+.nv-badge {
+  flex: none; min-width: 22px; padding: 2px 7px; border-radius: 999px;
+  background: var(--go-dim); color: var(--go);
+  font-family: var(--f-mono); font-size: 10.5px; text-align: center;
+}
+.nv-badge.soon { background: var(--pitch-2); color: var(--faint); font-size: 8.5px; text-transform: uppercase; letter-spacing: .1em; }
+.side-foot {
+  padding: 10px 16px; border-top: 1px solid var(--line);
+  font-family: var(--f-mono); font-size: 9.5px; color: var(--faint);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sf-dot { color: var(--go); }
+
+/* глобальный поиск в шапке (концепт) */
+.tablo-search {
+  display: flex; align-items: center; gap: 9px; flex: 1 1 auto; min-width: 0; max-width: 560px;
+  background: var(--pitch-1); border: 1px solid var(--line-strong); border-radius: 10px;
+  padding: 7px 12px; color: var(--faint);
+  transition: border-color .15s ease;
+}
+.tablo-search:focus-within { border-color: rgba(255, 180, 84, .5); color: var(--flut); }
+.tablo-search svg { width: 15px; height: 15px; flex: none; }
+.tablo-search input {
+  flex: 1 1 auto; min-width: 0; border: none; background: none; outline: none;
+  color: var(--chalk); font-size: 13px;
+}
+.tablo-search input::placeholder { color: var(--faint); }
+.search-wide { display: none; }
+/* поиск в шапке — только на широких экранах: табло на 1280 уже плотное
+   (Фаза 7 перенесёт метрики в правую часть, тогда порог опустится) */
+@media (min-width: 1440px) { .search-wide { display: flex; } }
+
+/* ── live-панель «Активный разбор» (каркас, наполняется в Фазе 5) ── */
+.live-panel {
+  grid-column: 3; grid-row: 2;
+  display: flex; flex-direction: column; gap: 0;
+  background: linear-gradient(180deg, rgba(16, 24, 18, .6), rgba(10, 16, 12, .2));
+  border-left: 1px solid var(--line);
+  min-height: 0; overflow-y: auto;
+}
+#livePanel[hidden] { display: none !important; }
+body.live-open #app { grid-template-columns: 266px minmax(0, 1fr) 340px; }
+body.live-open .rail { display: none; }   /* rail уступает место разбору */
+.lp-head {
+  display: flex; align-items: center; gap: 9px;
+  padding: 13px 16px; border-bottom: 1px solid var(--line);
+  font-family: var(--f-mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--flut);
+}
+.lp-head svg { width: 15px; height: 15px; }
+.lp-head .st { margin-left: auto; }
+.lp-match { padding: 12px 16px; border-bottom: 1px solid var(--line); font-size: 13.5px; font-weight: 600; }
+.lp-match small { display: block; margin-top: 3px; font-weight: 400; font-size: 11px; color: var(--faint); }
+.lp-sec { padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.lp-cap {
+  font-family: var(--f-mono); font-size: 9.5px; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--faint); margin-bottom: 8px;
+}
+.lp-list { display: flex; flex-direction: column; gap: 7px; font-size: 12.5px; color: var(--dim); }
+.lp-empty { color: var(--faint); font-size: 11.5px; }
+.lp-summary { font-size: 12.5px; line-height: 1.5; color: var(--dim); }
+.lp-conf { display: flex; align-items: center; gap: 10px; }
+.lp-bar { flex: 1; height: 6px; border-radius: 4px; background: var(--pitch-3); overflow: hidden; }
+.lp-bar i { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--mint), var(--go)); transition: width .4s ease; }
+.lp-conf b { font-family: var(--f-mono); font-size: 12px; color: var(--go); }
 .btn-new {
   display: flex; align-items: center; justify-content: center; gap: 9px;
   flex: 1 1 auto; min-width: 0; padding: 11px 12px;
@@ -1687,6 +1774,7 @@ html, body { overflow-x: clip; }
   .sig-table th { width: 92px; padding: 7px 10px; }
   .sig-table td { padding: 7px 10px; }
   .sig-head { padding: 9px 12px; font-size: 10px; }
+  .rtab { min-height: 44px; }              /* табы панели инструментов */
   .engine-info { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .field select { min-height: 44px; }
   .info-v { word-break: break-all; }            /* путь workspace переносится */
