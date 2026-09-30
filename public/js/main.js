@@ -7,6 +7,7 @@ import { createRail } from './rail.js';
 import { createSettings } from './settings.js';
 import { createEvents } from './events.js';
 import { createFeed } from './feed.js';
+import { createStats } from './stats.js';
 import { createProfile } from './profile.js';
 
 /* ── состояние ── */
@@ -132,6 +133,7 @@ chat.bindSessionStarted((init) => {
 
 const eventsView = createEvents({ chat });
 const feed = createFeed();
+const stats = createStats();
 const profile = createProfile();
 
 /* ══════════ Сайдбар: разделы (концепт-редизайн) + бейджи ══════════ */
@@ -140,13 +142,13 @@ document.querySelectorAll('.side-nav .nav-item').forEach((b) => {
     const nav = b.dataset.nav;
     if (nav === 'events') { feed.open(); document.body.classList.remove('side-open'); }
     if (nav === 'tracker') { eventsView.openTracker(); document.body.classList.remove('side-open'); }
+    if (nav === 'stats') { stats.open(); document.body.classList.remove('side-open'); }
     if (nav === 'fav') {
       // избранное живёт на странице матчей — включаем фильтр «только избранное»
       localStorage.setItem('sc_favOnly', '1');
       eventsView.open();
       document.body.classList.remove('side-open');
     }
-    if (nav === 'stats') toast('Статистика появится в ближайшем обновлении', 'info', 2600);
   });
 });
 
@@ -192,7 +194,7 @@ if (bottomNav) {
   bottomNav.querySelectorAll('button').forEach((b) => {
     b.addEventListener('click', () => {
       const nav = b.dataset.nav;
-      if (nav === 'chat') { feed.close(); eventsView.close(); }
+      if (nav === 'chat') { feed.close(); eventsView.close(); stats.close(); }
       if (nav === 'events') feed.open();
       if (nav === 'tracker') eventsView.openTracker();
       if (nav === 'profile') profile.open();

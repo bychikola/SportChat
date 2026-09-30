@@ -142,10 +142,9 @@
         <span class="nv-t">Экспрессы<small>Готовые комбинации</small></span>
         <b class="nv-badge" id="navExpress" hidden></b>
       </button>
-      <button class="nav-item" data-nav="stats" title="Появится в ближайшем обновлении">
+      <button class="nav-item" data-nav="stats">
         <svg><use href="#i-chart"/></svg>
         <span class="nv-t">Статистика<small>Показатели · Графики</small></span>
-        <b class="nv-badge soon">скоро</b>
       </button>
       <button class="nav-item" data-nav="fav">
         <svg><use href="#i-heart"/></svg>
@@ -323,6 +322,19 @@
           <div class="feed-cards" id="feedCards"></div>
         </div>
       </div>
+    </section>
+
+    <!-- ═══════════ СТАТИСТИКА (редизайн Ф6) ═══════════ -->
+    <section id="statsView" class="stats-view" hidden>
+      <div class="feed-head">
+        <div class="feed-title-row">
+          <span class="pane-title">Статистика</span>
+          <span class="feed-src">трекер сигналов · журнал решений</span>
+          <button id="statsRefresh" class="mini-icon" title="Обновить"><svg><use href="#i-clock"/></svg></button>
+        </div>
+        <div class="feed-hero" id="statsHero"></div>
+      </div>
+      <div class="feed-scroll" id="statsBody"></div>
     </section>
   </main>
 
