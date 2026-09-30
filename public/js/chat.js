@@ -378,12 +378,27 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
   /* Экспресс: кастомная таблица ног вместо сырого markdown-списка */
   function extractExpress(cur) {
     for (const md of cur.bubble.querySelectorAll('.md')) {
-      // заголовок экспресса может быть h2/h3/p — модель выбирает сама
-      const head = [...md.querySelectorAll(':scope > p, :scope > h2, :scope > h3')]
-        .find((el) => /^\s*ЭКСПРЕСС\s+[\d.,]+\s*x/i.test(el.textContent || ''));
-      if (!head) continue;
-      const legsOl = head.nextElementSibling;
-      if (!legsOl || !/^(OL|UL)$/.test(legsOl.tagName)) continue;
+      // заголовок может быть p/h2/h3/h4 и на любом уровне вложенности —
+      // модель каждый раз оформляет по-своему
+      const head = [...md.querySelectorAll('p, h2, h3, h4')]
+        .find((el) => /экспресс\s+[\d.,]+\s*x/i.test(el.textContent || ''));
+      // список ног: сразу после заголовка или в пределах 4 следующих блоков
+      let legsOl = null;
+      if (head) {
+        let sib = head.nextElementSibling;
+        for (let i = 0; sib && i < 4; i++) {
+          if (/^(OL|UL)$/.test(sib.tagName)) { legsOl = sib; break; }
+          sib = sib.nextElementSibling;
+        }
+      }
+      // запасной путь: любой список, где большинство строк — «… @ кэф»
+      if (!legsOl) {
+        legsOl = [...md.querySelectorAll('ol, ul')].find((ol) => {
+          const lis = [...ol.querySelectorAll(':scope > li')];
+          return lis.length >= 2 && lis.filter((li) => /@\s*[\d.,]+/.test(li.textContent)).length >= 2 && /экспресс/i.test(md.textContent);
+        });
+      }
+      if (!legsOl) continue;
       const legs = [...legsOl.querySelectorAll(':scope > li')].map((li) => {
         // «Матч с тире (время) — Рынок @ кэф — почему»: сегмент с «@» — это рынок,
         // всё до него — матч (тире внутри названий команд не трогаем)
@@ -398,7 +413,7 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
       }).filter(Boolean);
       if (legs.length < 2) continue;
 
-      const headOdds = parseFloat((/ЭКСПРЕСС\s+([\d.,]+)\s*x/i.exec(head.textContent) || [])[1]?.replace(',', '.') || 0);
+      const headOdds = parseFloat((/экспресс\s+([\d.,]+)\s*x/i.exec(head ? head.textContent : md.textContent) || [])[1]?.replace(',', '.') || 0);
       const odds = headOdds || legs.reduce((a, l) => a * l.odds, 1);
       const mdText = md.textContent;
       const prob = (/вероятност\w+\s+захода[^%]*?(\d+(?:[.,]\d+)?)\s*%/i.exec(mdText) || [])[1];
@@ -428,8 +443,8 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
       card.appendChild(bar);
 
       // сырой список ног уходит из текста — остаётся только карточка
+      if (head) head.remove();
       legsOl.remove();
-      head.remove();
       cur.wrap.appendChild(card);
       scrollDown(true);
       break; // один экспресс на ответ
