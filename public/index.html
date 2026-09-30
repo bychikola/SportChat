@@ -291,6 +291,38 @@
         <div class="ev-menu-list" id="evPresetList"></div>
       </div>
     </section>
+
+    <!-- ═══════════ ЛЕНТА ПРОГНОЗОВ (редизайн Ф4) ═══════════ -->
+    <section id="feedView" class="feed-view" hidden>
+      <div class="feed-head">
+        <div class="feed-title-row">
+          <span class="pane-title">Лента прогнозов</span>
+          <span class="feed-src">sstats.net · Poisson-модель</span>
+          <button id="feedRefresh" class="mini-icon" title="Обновить ленту"><svg><use href="#i-clock"/></svg></button>
+        </div>
+        <div class="feed-dates" id="feedDates"></div>
+        <div class="feed-hero" id="feedHero"></div>
+        <div class="feed-filters" id="feedFilters">
+          <button class="feed-filter active" data-f="all">Все матчи</button>
+          <button class="feed-filter" data-f="banker">Bankers</button>
+          <button class="feed-filter" data-f="express">Экспрессы</button>
+          <button class="feed-filter" data-f="ai">AI анализ</button>
+        </div>
+      </div>
+      <div class="feed-scroll">
+        <div id="feedExpress" class="feed-express"></div>
+        <div class="feed-table-wrap">
+          <table class="feed-table">
+            <thead><tr>
+              <th>Время</th><th class="ft-match">Матч</th><th>P1</th><th>X</th><th>P2</th>
+              <th>Рынок</th><th>Кэф</th><th>Fair</th><th>Value</th><th>Conf</th>
+            </tr></thead>
+            <tbody id="feedBody"></tbody>
+          </table>
+          <div class="feed-cards" id="feedCards"></div>
+        </div>
+      </div>
+    </section>
   </main>
 
   <!-- ═══════════ Правый рейл ═══════════ -->

@@ -14,12 +14,14 @@ import {
 import sstatsRouter from './sstats.js';
 import signalsRouter from './signals.js';
 import authRouter from './auth.js';
+import feedRouter from './feed.js';
 
 const router = express.Router();
 
 router.use('/sstats', sstatsRouter);
 router.use('/signals', signalsRouter);
 router.use('/auth', authRouter);
+router.use('/feed', feedRouter);
 
 /* ---------- meta & sessions ---------- */
 

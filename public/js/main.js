@@ -6,6 +6,7 @@ import { createChat } from './chat.js';
 import { createRail } from './rail.js';
 import { createSettings } from './settings.js';
 import { createEvents } from './events.js';
+import { createFeed } from './feed.js';
 import { createProfile } from './profile.js';
 
 /* ── состояние ── */
@@ -130,13 +131,14 @@ chat.bindSessionStarted((init) => {
 });
 
 const eventsView = createEvents({ chat });
+const feed = createFeed();
 const profile = createProfile();
 
 /* ══════════ Сайдбар: разделы (концепт-редизайн) + бейджи ══════════ */
 document.querySelectorAll('.side-nav .nav-item').forEach((b) => {
   b.addEventListener('click', () => {
     const nav = b.dataset.nav;
-    if (nav === 'events') { eventsView.open(); document.body.classList.remove('side-open'); }
+    if (nav === 'events') { feed.open(); document.body.classList.remove('side-open'); }
     if (nav === 'tracker') { eventsView.openTracker(); document.body.classList.remove('side-open'); }
     if (nav === 'fav') {
       // избранное живёт на странице матчей — включаем фильтр «только избранное»
@@ -190,17 +192,18 @@ if (bottomNav) {
   bottomNav.querySelectorAll('button').forEach((b) => {
     b.addEventListener('click', () => {
       const nav = b.dataset.nav;
-      if (nav === 'chat') eventsView.close();
-      if (nav === 'events') eventsView.open();
+      if (nav === 'chat') { feed.close(); eventsView.close(); }
+      if (nav === 'events') feed.open();
       if (nav === 'tracker') eventsView.openTracker();
       if (nav === 'profile') profile.open();
     });
   });
-  // активная вкладка следует за состоянием страницы событий
+  // активная вкладка: чат / события / лента
   new MutationObserver(() => {
-    const open = document.body.classList.contains('events-open');
+    const cls = document.body.classList;
+    const active = cls.contains('feed-open') || cls.contains('events-open') ? 'events' : 'chat';
     bottomNav.querySelectorAll('button').forEach((x) =>
-      x.classList.toggle('active', x.dataset.nav === (open ? 'events' : 'chat')));
+      x.classList.toggle('active', x.dataset.nav === active));
   }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
 }
 
