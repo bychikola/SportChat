@@ -91,6 +91,7 @@ export function lpBegin(query = '') {
   startedAt = Date.now();
   seenSources = new Set();
   toolRows.clear();
+  lpResetToRun();
   $('#lpSourceList').innerHTML = '<div class="lp-empty">Собираю источники…</div>';
   $('#lpActionList').innerHTML = '<div class="lp-empty">Жду первые действия…</div>';
   $('#lpSummary').textContent = 'Думаю…';
@@ -179,4 +180,66 @@ export function lpDone(stopped = false) {
   const total = ((Date.now() - startedAt) / 1000).toFixed(1);
   const live = $('#livePanel .lp-head .st');
   if (live) { live.className = 'st st-ok'; live.textContent = stopped ? 'ПРЕРВАНО' : `ГОТОВО · ${total}с`; }
+}
+
+/** ── Match Drawer (Фаза 9.1): детали матча из ленты без запуска агента ── */
+export function lpShowMatch(m, onAnalyze) {
+  const panel = $('#livePanel');
+  if (!panel) return;
+  document.body.classList.add('live-open');
+  panel.hidden = false;
+  active = false;
+  seenSources = new Set();
+  toolRows.clear();
+
+  const live = panel.querySelector('.lp-head .st');
+  if (live) { live.className = 'st st-ok'; live.textContent = 'ИЗ ЛЕНТЫ'; }
+
+  const match = $('#lpMatch');
+  match.hidden = false;
+  match.innerHTML = `
+    <span class="lp-q">${esc(m.home)} — ${esc(m.away)}</span>
+    <small>${esc(m.league)} · ${esc(m.day)} ${esc(m.time)} · МСК</small>`;
+
+  // секции хода не относятся к статичным деталям
+  $('#lpSources').style.display = 'none';
+  $('#lpActions').style.display = 'none';
+
+  const bestP = Math.max(m.p1, m.px, m.p2);
+  $('#lpSummary').innerHTML = `
+    <table class="sig-table">
+      <tr><th>P1 / X / P2</th><td class="sig-odds">${m.p1}% · ${m.px}% · ${m.p2}%</td></tr>
+      <tr><th>Лучший рынок</th><td>${esc(m.market)}</td></tr>
+      <tr><th>Кэф</th><td class="sig-odds">${m.odds}</td></tr>
+      <tr><th>Fair</th><td class="sig-odds">${m.fair}</td></tr>
+      <tr><th>Value</th><td class="sig-odds" style="color:${m.value > 0 ? 'var(--go)' : 'var(--faint)'}">${m.value > 0 ? '+' : ''}${m.value}%</td></tr>
+      <tr><th>Вероятность</th><td class="sig-odds">${bestP}%</td></tr>
+      <tr><th>Confidence</th><td class="sig-odds" style="color:var(--sky)">${m.confidence}%</td></tr>
+    </table>
+    <div class="lp-note">${m.tag === 'banker' ? '🛡️ Banker — повышенная надёжность по модели.' : '🤖 AI-анализ: значение из Poisson-модели ленты.'}</div>`;
+
+  const bar = $('#lpConfBar');
+  if (bar) bar.style.width = clamp(m.confidence, 0, 100) + '%';
+  const val = $('#lpConfVal');
+  if (val) val.textContent = m.confidence + '%';
+
+  let btn = $('#lpAnalyzeBtn');
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.id = 'lpAnalyzeBtn';
+    btn.className = 'btn-primary notch-sm lp-analyze';
+    panel.appendChild(btn);
+  }
+  btn.hidden = false;
+  btn.textContent = 'Разобрать в чате';
+  btn.onclick = () => { if (onAnalyze) onAnalyze(m); };
+}
+
+/** Вернуть панель в режим хода (сброс матч-режима). */
+export function lpResetToRun() {
+  $('#lpSources').style.display = '';
+  $('#lpActions').style.display = '';
+  $('#lpAnalyzeBtn')?.remove();
+  const btn = $('#lpAnalyzeBtn');
+  if (btn) btn.hidden = true;
 }

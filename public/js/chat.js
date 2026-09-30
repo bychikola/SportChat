@@ -1,6 +1,6 @@
 /* Чат: сборка стрима, карточки инструментов, разрешения, история */
 
-import { $, esc, icon, toolIcon, toolSummary, fmtCost, fmtInt, timeStr, toast } from './util.js';
+import { $, esc, icon, toolIcon, toolSummary, fmtCost, fmtInt, timeStr, toast, rejectReasons } from './util.js';
 import { api } from './api.js';
 import { lpBegin, lpToolStart, lpToolDetail, lpToolEnd, lpText, lpDone, lpConfidenceFromWord, setConf } from './livepanel.js';
 import { mdToHtml } from './md.js';
@@ -196,6 +196,7 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
 
   function setToolStatus(t, status) {
     t.status = status;
+    if (!t.card) return; // structured tool (emit_prediction) — карточки нет
     const chip = t.card.querySelector('.st');
     t.card.classList.remove('running', 'ok', 'err');
     if (status === 'ok') {
@@ -298,7 +299,7 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
     } catch { /* приватный режим — журнал не критичен */ }
   }
 
-  function decideBar({ acceptLabel, onAccept, skipLabel = 'Пропускаю' }) {
+  function decideBar({ acceptLabel, onAccept, skipLabel = 'Пропускаю', onSkip }) {
     const bar = document.createElement('div');
     bar.className = 'sig-actions';
     bar.innerHTML = `
@@ -319,11 +320,18 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
       try { await onAccept(); } catch (e) { acc.disabled = false; acc.textContent = acceptLabel; toast(e.message, 'err'); return; }
       decide(true, 'принято');
     });
-    skip.addEventListener('click', () => decide(false, 'пропущено'));
+    // Фаза 9.2: причина отклонения → в журнал решений
+    skip.addEventListener('click', () => {
+      rejectReasons((key, label) => {
+        decide(false, `пропущено · ${label.toLowerCase()}`);
+        onSkip?.(key);
+      });
+    });
     return { bar };
   }
 
   function extractSignal(cur) {
+    if (cur?.structuredSeen) return; // emit_prediction уже отрисовал карточку
     const text = [...cur.bubble.querySelectorAll('.md')].map((el) => el.textContent).join('\n');
     const line = /СИГНАЛ:\s*([^\n]+)/.exec(text);
     if (!line) return;
@@ -369,9 +377,7 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
         logDecision({ type: 'signal', match: fields.матч || '', market: fields.рынок || '', pick: fields.pick, odds: fields.кэф || null, accepted: true });
         toast('Сигнал принят — точность посчитается после матча', 'ok', 3600);
       },
-    });
-    bar.querySelector('.sig-skip').addEventListener('click', () => {
-      logDecision({ type: 'signal', match: fields.матч || '', market: fields.рынок || '', pick: fields.pick, odds: fields.кэф || null, accepted: false });
+      onSkip: (key) => logDecision({ type: 'signal', match: fields.матч || '', market: fields.рынок || '', pick: fields.pick, odds: fields.кэф || null, accepted: false, reason: key }),
     });
     card.appendChild(bar);
     cur.wrap.appendChild(card);
@@ -380,6 +386,7 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
 
   /* Экспресс: кастомная таблица ног вместо сырого markdown-списка */
   function extractExpress(cur) {
+    if (cur?.structuredSeen) return; // emit_prediction уже отрисовал карточку
     for (const md of cur.bubble.querySelectorAll('.md')) {
       // заголовок может быть p/h2/h3/h4 и на любом уровне вложенности —
       // модель каждый раз оформляет по-своему
@@ -440,9 +447,7 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
           logDecision({ type: 'express', legs, odds, probability: prob || null, accepted: true });
           toast('Экспресс принят — запись в журнале решений', 'ok', 3600);
         },
-      });
-      bar.querySelector('.sig-skip').addEventListener('click', () => {
-        logDecision({ type: 'express', legs, odds, probability: prob || null, accepted: false });
+        onSkip: (key) => logDecision({ type: 'express', legs, odds, probability: prob || null, accepted: false, reason: key }),
       });
       card.appendChild(bar);
 
@@ -454,6 +459,81 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
       break; // один экспресс на ответ
     }
   }
+
+  /* ── Structured prediction (Фаза 9.4/9.5): нативные карточки из tool emit_prediction ──
+   * Реестр типов: prediction → сигнал-карточка, express → экспресс-карточка.
+   * СИГНАЛ-строка остаётся fallback: если structuredSeen, текстовый парс пропускаем. */
+  function renderStructured(data) {
+    if (!data || !data.type) return;
+    const renderer = STRUCTURED_RENDERERS[data.type];
+    if (renderer) renderer(data);
+  }
+
+  const STRUCTURED_RENDERERS = {
+    prediction(d) {
+      const leg = d.legs?.[0];
+      if (!leg) return;
+      const card = document.createElement('div');
+      card.className = 'signal-card notch';
+      card.innerHTML = `
+        <div class="sig-head">${icon('bolt')} СИГНАЛ — решение по ставке</div>
+        <table class="sig-table">
+          <tr><th>Матч</th><td>${esc(leg.match)}</td></tr>
+          <tr><th>Рынок</th><td>${esc(leg.market)}</td></tr>
+          <tr><th>Ставка</th><td class="sig-bet">${esc(leg.pick || leg.market)}</td></tr>
+          <tr><th>Кэф</th><td class="sig-odds">${leg.odds}</td></tr>
+          ${d.probability != null ? `<tr><th>Вероятность</th><td class="sig-odds">${d.probability}%</td></tr>` : ''}
+          ${d.confidence ? `<tr><th>Уверенность</th><td>${esc(d.confidence)}</td></tr>` : ''}
+        </table>`;
+      const { bar } = decideBar({
+        acceptLabel: 'Принимаю ставку',
+        onAccept: async () => {
+          await api('/signals', { method: 'POST', body: {
+            gameId: leg.gameId, match: leg.match, market: leg.market, key: leg.key,
+            pick: leg.pick || leg.market, odds: leg.odds, confidence: d.confidence || '',
+          }});
+          logDecision({ type: 'signal', match: leg.match, market: leg.market, pick: leg.pick, odds: leg.odds, accepted: true });
+          toast('Сигнал принят — точность посчитается после матча', 'ok', 3600);
+        },
+        onSkip: (key) => logDecision({ type: 'signal', match: leg.match, market: leg.market, pick: leg.pick, odds: leg.odds, accepted: false, reason: key }),
+      });
+      card.appendChild(bar);
+      cur.wrap.appendChild(card);
+      if (d.probability != null) setConf(d.probability, 'вероятность');
+    },
+
+    express(d) {
+      const legs = (d.legs || []).map((l) => ({ ...l, odds: Number(l.odds) }));
+      if (legs.length < 2) return;
+      const card = document.createElement('div');
+      card.className = 'signal-card express notch';
+      card.innerHTML = `
+        <div class="sig-head">${icon('bolt')} ЭКСПРЕСС ${d.odds}x${d.probability != null ? ` · вероятность ~${d.probability}%` : ''} — решение</div>
+        <table class="sig-table">
+          <thead><tr><th>№</th><th>Матч</th><th>Рынок</th><th>Кэф</th></tr></thead>
+          <tbody>
+            ${legs.map((l, i) => `<tr><td>${i + 1}</td><td>${esc(l.match)}</td><td>${esc(l.market)}</td><td class="sig-odds">${l.odds}</td></tr>`).join('')}
+          </tbody>
+          <tfoot><tr><td colspan="3">Итоговый коэффициент</td><td class="sig-odds">${d.odds}</td></tr></tfoot>
+        </table>
+        ${d.risk ? `<div class="express-risk"><svg><use href="#i-alert"/></svg> ${esc(d.risk)}</div>` : ''}`;
+      const { bar } = decideBar({
+        acceptLabel: 'Принимаю экспресс',
+        onAccept: async () => {
+          await api('/predictions', { method: 'POST', body: {
+            legs: legs.map((l) => ({ gameId: l.gameId, match: l.match, market: l.market, key: l.key, pick: l.pick, odds: l.odds })),
+            odds: d.odds, fair: d.fair, ev: d.ev, probability: d.probability, risk: d.risk, source: 'chat',
+          }});
+          logDecision({ type: 'express', legs, odds: d.odds, probability: d.probability, accepted: true });
+          toast('Экспресс принят — статус ног будет отслеживаться', 'ok', 3600);
+        },
+        onSkip: (key) => logDecision({ type: 'express', legs, odds: d.odds, probability: d.probability, accepted: false, reason: key }),
+      });
+      card.appendChild(bar);
+      cur.wrap.appendChild(card);
+      if (d.probability != null) setConf(d.probability, 'вероятность захода');
+    },
+  };
 
   function finishRunMeta(m) {
     if (!m || !cur) return;
@@ -507,8 +587,15 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
         if (msg.kind === 'text') pushTextSegment(msg.index);
         else if (msg.kind === 'thinking') pushThinkingSegment(msg.index);
         else if (msg.kind === 'tool') {
-          toolCard(msg.id, msg.name);
-          cur.segs.set(msg.index, { kind: 'tool', id: msg.id });
+          // structured prediction (9.4): карточку рисуем из input, tool-card не нужен
+          if (/emit_prediction/i.test(msg.name)) {
+            cur.segs.set(msg.index, { kind: 'tool', id: msg.id, skipCard: true });
+            cur.tools.set(msg.id, { id: msg.id, name: msg.name, status: 'run', card: null, inputRaw: '', result: '' });
+            lpToolStart(msg.id, msg.name);
+          } else {
+            toolCard(msg.id, msg.name);
+            cur.segs.set(msg.index, { kind: 'tool', id: msg.id });
+          }
         }
         break;
       }
@@ -539,8 +626,18 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
           t.inputRaw += msg.v;
           try {
             t.inputObj = JSON.parse(t.inputRaw);
-            t.card.querySelector('.tc-summary').textContent = toolSummary(t.name, t.inputObj) || '…';
-            lpToolDetail(t.id, t.inputObj);
+            // structured prediction (9.4/9.5): нативная карточка вместо tool-card
+            if (entry.skipCard && /emit_prediction/i.test(t.name)) {
+              if (!t.structuredRendered) {
+                t.structuredRendered = true;
+                cur.structuredSeen = true;
+                renderStructured(t.inputObj);
+                scrollDown(true);
+              }
+            } else {
+              t.card.querySelector('.tc-summary').textContent = toolSummary(t.name, t.inputObj) || '…';
+              lpToolDetail(t.id, t.inputObj);
+            }
           } catch { /* json ещё не собран */ }
         }
         break;
@@ -558,7 +655,7 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
         if (t) {
           t.result = msg.preview || '';
           setToolStatus(t, msg.isError ? 'err' : 'ok');
-          if (t.card.classList.contains('open')) showToolResult(t, t.result, msg.isError);
+          if (t.card && t.card.classList.contains('open')) showToolResult(t, t.result, msg.isError);
         }
         lpToolEnd(msg.id, !msg.isError);
         rail.updateEpisode(t || { id: msg.id, status: msg.isError ? 'err' : 'ok' });

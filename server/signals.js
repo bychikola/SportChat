@@ -33,7 +33,7 @@ function parseTs(v) {
 }
 
 /** Исход ставки по финальному счёту. */
-function outcomeFor(key, g) {
+export function outcomeFor(key, g) {
   const h = Number(g.homeResult), a = Number(g.awayResult);
   if (Number.isNaN(h) || Number.isNaN(a)) return null;
   const k = String(key).toLowerCase().replace(',', '.');

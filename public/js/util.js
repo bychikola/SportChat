@@ -70,6 +70,39 @@ export function toast(message, kind = '', ms = 3800) {
   }, ms);
 }
 
+/* ── popup «Почему отклонили?» (Фаза 9.2) ── */
+const REJECT_REASONS = [
+  ['high_risk', 'Высокий риск'],
+  ['disagree', 'Не согласен с анализом'],
+  ['low_odds', 'Низкий коэффициент'],
+  ['not_interested', 'Не интересует матч'],
+  ['other', 'Другое'],
+];
+
+/** Оверлей с причинами отклонения. onPick(key, label) — по выбору. */
+export function rejectReasons(onPick) {
+  const ov = document.createElement('div');
+  ov.className = 'overlay reason-overlay';
+  ov.innerHTML = `
+    <div class="modal reason-pop notch" role="dialog" aria-label="Причина отклонения">
+      <div class="modal-head"><div><div class="modal-title">Почему отклонили?</div>
+      <div class="modal-sub">поможет сделать прогнозы точнее</div></div></div>
+      <div class="reason-list">
+        ${REJECT_REASONS.map(([k, l]) => `<button class="reason-item" data-k="${k}">${l}</button>`).join('')}
+      </div>
+      <div class="reason-foot"><button class="reason-cancel btn-secondary notch-sm">Отмена</button></div>
+    </div>`;
+  const close = () => ov.remove();
+  ov.addEventListener('mousedown', (e) => { if (e.target === ov) close(); });
+  ov.querySelector('.reason-cancel').addEventListener('click', close);
+  ov.querySelectorAll('.reason-item').forEach((b) => b.addEventListener('click', () => {
+    close();
+    const r = REJECT_REASONS.find(([k]) => k === b.dataset.k);
+    onPick(r[0], r[1]);
+  }));
+  document.getElementById('modalRoot').appendChild(ov);
+}
+
 /* ── модалки ── */
 export function openModal({ title, sub = '', wide = false, body, foot = [] }) {
   closeModal();

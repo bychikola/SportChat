@@ -524,6 +524,20 @@ body.stats-open .composer-wrap { display: none; }
 .dbar-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
 .dbar-legend i.ok { background: var(--go); }
 .dbar-legend i.skip { background: var(--pitch-3); }
+
+/* мои прогнозы (9.3) */
+.myp-list { display: flex; flex-direction: column; gap: 10px; }
+.myp-card { padding: 12px 14px; background: var(--pitch-2); box-shadow: inset 0 0 0 1px var(--line); }
+.myp-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; font-family: var(--f-mono); font-size: 12px; }
+.myp-head b { color: var(--flut); }
+.myp-odds { margin-left: auto; font-weight: 700; color: var(--chalk); font-size: 14px; }
+.myp-leg { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 5px 0; border-bottom: 1px solid var(--line); color: var(--dim); }
+.myp-leg svg { width: 13px; height: 13px; flex: none; color: var(--faint); }
+.myp-leg:last-of-type { border-bottom: none; }
+.myp-leg-match { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--chalk); }
+.myp-leg-market { flex: none; color: var(--flut); font-size: 11px; }
+.myp-leg-score { font-family: var(--f-mono); font-size: 11px; flex: none; width: 48px; text-align: right; }
+.myp-foot { display: flex; gap: 14px; margin-top: 8px; font-family: var(--f-mono); font-size: 10.5px; color: var(--faint); }
 .btn-new {
   display: flex; align-items: center; justify-content: center; gap: 9px;
   flex: 1 1 auto; min-width: 0; padding: 11px 12px;

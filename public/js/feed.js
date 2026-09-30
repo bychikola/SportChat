@@ -1,7 +1,8 @@
 /* Лента прогнозов (PLAN-REDESIGN Ф4): дата-табы, hero-плитки, таблица матчей,
  * карточка экспресса дня с решением пользователя. Данные — /api/feed (Фаза 3). */
-import { $, esc, toast } from './util.js';
+import { $, esc, toast, rejectReasons } from './util.js';
 import { api } from './api.js';
+import { lpShowMatch } from './livepanel.js';
 
 const DAY_LABELS = ['ВС', 'ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ'];
 
@@ -84,7 +85,13 @@ export function createFeed() {
       try { await onAccept(); } catch (e) { acc.disabled = false; acc.textContent = acceptLabel; toast(e.message, 'err'); return; }
       decide(true, acceptedNote);
     });
-    skip.addEventListener('click', () => decide(false, skipNote));
+    skip.addEventListener('click', () => {
+      // Фаза 9.2: причина отклонения → в журнал решений
+      rejectReasons((key, label) => {
+        decide(false, `пропущено · ${label.toLowerCase()}`);
+        if (skipNote?.onSkip) skipNote.onSkip(key);
+      });
+    });
     card.appendChild(bar);
   }
 
@@ -132,14 +139,14 @@ export function createFeed() {
     decideCard(card, {
       acceptLabel: 'Принимаю экспресс',
       onAccept: async () => {
+        await api('/predictions', { method: 'POST', body: {
+          legs: ex.legs, odds: ex.odds, fair: ex.fair, ev: ex.ev, probability: ex.probability, risk: ex.risk, source: 'feed',
+        }});
         logDecision({ type: 'express', legs: ex.legs, odds: ex.odds, probability: ex.probability, accepted: true, source: 'feed' });
-        toast('Экспресс принят — запись в журнале решений', 'ok', 3400);
+        toast('Экспресс принят — статус ног будет отслеживаться', 'ok', 3600);
       },
-      acceptedNote: 'принято — в журнале решений',
-      skipNote: 'пропущено',
-    });
-    card.querySelector('.sig-skip').addEventListener('click', () => {
-      logDecision({ type: 'express', legs: ex.legs, odds: ex.odds, probability: ex.probability, accepted: false, source: 'feed' });
+      acceptedNote: 'принято — в «Моих прогнозах»',
+      skipNote: { onSkip: (key) => logDecision({ type: 'express', legs: ex.legs, odds: ex.odds, probability: ex.probability, accepted: false, reason: key, source: 'feed' }) },
     });
     box.innerHTML = '';
     box.appendChild(card);
@@ -185,7 +192,9 @@ export function createFeed() {
     for (const el of [...tbody.querySelectorAll('.feed-row'), ...cards.querySelectorAll('.feed-card')]) {
       el.addEventListener('click', () => {
         const m = list.find((x) => String(x.id) === el.dataset.id);
-        if (m) toChat(m);
+        if (!m) return;
+        // Match Drawer (Фаза 9.1): детали в правой панели, разбор — по кнопке
+        lpShowMatch(m, (match) => toChat(match));
       });
     }
   }

@@ -77,12 +77,43 @@ export function createStats() {
       </div>`).join('');
   }
 
+  /* ── мои прогнозы (Фаза 9.3): принятые экспрессы со статусом ног ── */
+  const STATUS = {
+    pending: ['в работе', 'run'],
+    won: ['зашло', 'ok'],
+    lost: ['мимо', 'err'],
+    void: ['возврат', ''],
+  };
+  function myPredictions(list) {
+    if (!list || !list.length) return '<div class="empty-note">Принятых экспрессов пока нет — нажми «Принимаю» на карточке в ленте.</div>';
+    return `<div class="myp-list">${list.map((p) => `
+      <div class="myp-card notch">
+        <div class="myp-head">
+          <b>${esc(p.id)}</b>
+          <span class="st st-${STATUS[p.status]?.[1] || 'run'}">${STATUS[p.status]?.[0] || p.status}</span>
+          <span class="myp-odds">${p.odds}x</span>
+        </div>
+        ${p.legs.map((l) => `
+          <div class="myp-leg">
+            <svg><use href="#${l.status === 'won' ? 'i-check' : l.status === 'lost' ? 'i-x' : 'i-clock'}"/></svg>
+            <span class="myp-leg-match">${esc(l.match)}</span>
+            <span class="myp-leg-market">${esc(l.market)}</span>
+            <span class="myp-leg-score">${esc(l.score || '—')}</span>
+          </div>`).join('')}
+        <div class="myp-foot">
+          <span>Fair ${p.fair ?? '—'}x</span><span>EV +${p.ev ?? 0}%</span><span>P ${p.probability ?? '—'}%</span>
+        </div>
+      </div>`).join('')}</div>`;
+  }
+
   async function load() {
     const body = $('#statsBody');
     body.innerHTML = '<div class="empty-note">Считаю показатели…</div>';
     let stats = null;
     let decisions = [];
+    let predictions = null;
     try { stats = (await api('/signals')).stats; } catch { /* без трекера */ }
+    try { predictions = (await api('/predictions')).predictions; } catch { /* без моих прогнозов */ }
     try { decisions = JSON.parse(localStorage.getItem('sc_signalDecisions') || '[]'); } catch { /* приватный режим */ }
     if (!stats) {
       body.innerHTML = '<div class="empty-note">Трекер сигналов недоступен.</div>';
@@ -90,6 +121,10 @@ export function createStats() {
     }
     $('#statsHero').innerHTML = hero(stats, decisions);
     body.innerHTML = `
+      <div class="stats-sec notch">
+        <div class="stats-cap">Мои прогнозы</div>
+        ${myPredictions(predictions)}
+      </div>
       <div class="stats-sec notch">
         <div class="stats-cap">Точность по рынкам</div>
         ${marketBars(stats.byMarket)}

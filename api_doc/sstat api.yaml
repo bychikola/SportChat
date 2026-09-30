@@ -1,0 +1,7436 @@
+openapi: 3.1.1
+info:
+  title: SStats.net - Football API
+  description: "API футбольных матчей, доматчевые и live коэффициенты, статистика,
+    профиты, Glicko 2\r
+
+    \r
+
+    Весь функционал API бесплатен, с ограничением по количеству запросов. \r
+
+    Без api ключа ограничение 300 в минуту запросов на всех пользователей, или
+    30 запросов в минуту на 1 IP адрес.\r
+
+    \r
+
+    [Введение в API](https://sstats.net/api)"
+  contact:
+    name: Поддержка
+    url: https://vk.com/sstats_net
+  version: 0.9.40.0
+servers:
+  - url: https://api.sstats.net
+    description: SStats.net API
+paths:
+  /Account/Info:
+    get:
+      tags:
+        - Account
+      summary: Аккаунт
+      description: Получение данных о текущем авторизированном пользователе
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfAccountInfo"
+      security:
+        - ApiAuthScheme: []
+  /Excel/Delux:
+    get:
+      tags:
+        - Excel
+      summary: Delux
+      description: >-
+        Запрос используется в excel таблице для прогнозирования футбольных
+        матчей DeluX_API-based.
+
+        Эта таблица является модификацией таблицы *DeluX_plus IncoProrok.xlsm*,
+        в которой парсер сайта Flashscore заменен на API сайта sstats.net
+                    
+        Запрос за раз выгружает все необходимые данные, которая требует таблица
+        для анализа матча
+
+
+        Подробнее о таблице и использованию запроса в руководстве [Excel
+        Delux](https://sstats.net/posts/api-excel-delux)
+                    
+        Для получения данных по конкретному матчу необходимо указать *gameId*
+
+        Для получения данных за день, необходимо указать *dayOffset*
+      parameters:
+        - name: gameId
+          in: query
+          description: ""
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+        - name: dayOffset
+          in: query
+          description: "День. 0 - сегодня, -1 - вчера, -2 - позавчера, 1 - завтра, 2 -
+            после завтра и т.д. Диапазон: [-1000, 30]"
+          schema:
+            maximum: 30
+            minimum: -1000
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+            default: 0
+        - name: timeZone
+          in: query
+          description: Часовой пояс
+          schema:
+            maximum: 12
+            minimum: -12
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+            default: 3
+      responses:
+        "200":
+          description: ""
+          content:
+            text/plain: {}
+  /Excel/FootballCalc:
+    get:
+      tags:
+        - Excel
+      summary: Football calculation
+      description: >-
+        Запрос, используемой в excel таблице для прогнозирования матчей
+        football-calculation-table_API-based.xlsb
+                    
+        Эта таблица является модифицированной версией
+        football-calculation-table-v.2.1-by-kish.xlsb
+
+
+        Для получения данных по конкретному матчу необходимо указать *gameId*
+
+        Для получения данных за день, необходимо указать *dayOffset*
+      parameters:
+        - name: gameId
+          in: query
+          description: Идентифиатор матча sstats.net
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+        - name: dayOffset
+          in: query
+          description: "День. 0 - сегодня, -1 - вчера, -2 - позавчера, 1 - завтра, 2 -
+            после завтра и т.д. Диапазон: [-1000, 30]"
+          schema:
+            maximum: 30
+            minimum: -1000
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+            default: 0
+        - name: timeZone
+          in: query
+          description: Часовой пояс
+          schema:
+            maximum: 12
+            minimum: -12
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+            default: 3
+      responses:
+        "200":
+          description: ""
+  /Excel/Results:
+    get:
+      tags:
+        - Excel
+      summary: Результаты
+      description: |-
+        Извлечение результатов матчей
+                    
+                    
+        Ответ содержит таблицу  
+        `Id,Date,HomeHalfTimeScore,AwayHalfTimeScore,HomeFullTimeScore,AwayFullTimeScore,Ended`
+      parameters:
+        - name: id
+          in: query
+          description: список матчей через запятую. Максимум 500 значений
+          required: true
+          schema:
+            type: string
+        - name: header
+          in: query
+          description: Включить заголовок в ответ
+          schema:
+            type: boolean
+            default: true
+      responses:
+        "200":
+          description: ""
+          content:
+            text/plain: {}
+  /Games/list:
+    get:
+      tags:
+        - Games
+      summary: Список матчей
+      description: |-
+        Извлечение списка матчей. Данные о каждом матче возвращаются в сокращенном варианте (Id, время, статус, счет, названия команд их их ID, сезон, тур, коэффициенты).  
+        Коэффициенты в сокращенном варианте: 1X2, Total. (на момент ближе к закрытию линии)
+
+        Для получения полной информации о конкретном матче используется [/games/{id}](#tag/games/GET/Games/{id})
+                    
+        Одним запросом можно извлечь не более 1000 матчей. Чтобы извлечь остальные, нужно использовать несколько запросов, увеличивая &offset=N.
+
+        **Например**:  
+        `&offset=0&limit=10` - отобразит первые 10 матчей  
+        `&offset=10&limit=10` - отобразит следующие 10 матчей (пропуская первые 10)
+                    
+        ---
+
+        #### Примеры:
+        Извлечение всех матчей по id лиги и году сезона  
+        https://api.sstats.net/games/list?leagueid=183&year=2022
+
+        Извлечение всех матчей по id сезона 1DC9CB60-0958-11EE-B462-879841420925  
+        https://api.sstats.net/games/list?seasonUid=1DC9CB60-0958-11EE-B462-879841420925
+
+        Извлечение всех матчей по id лиги и временному интервалу  
+        https://api.sstats.net/games/list?leagueid=183&from=2022-10-30&to=2022-12-30
+
+        Предстоящие матчи команды  
+        https://api.sstats.net/games/list?upcoming=true&team=529
+
+        Прошедшие матчи между командами когда они играли друг с другом (Head 2 Head)  
+        https://api.sstats.net/games/list?ended=true&bothTeams=529,541
+      parameters:
+        - name: Id
+          in: query
+          description: Id матча. Один или несколько через запятую.
+          schema:
+            pattern: ^\d+(?:,\d+)*$
+            type: string
+          example: 1415356,1469598
+        - name: FlashId
+          in: query
+          description: |-
+            Id матча c Flashscore. Один или несколько через запятую.
+            <example>"vyHkOT87,SYAMaLNi"</example>
+          schema:
+            pattern: ^\w+(?:,\w+)*$
+            type: string
+        - name: LeagueId
+          in: query
+          description: >-
+            Id лиги
+
+            <remarks>Список лиг можно получить через
+            <code>/leagues</code></remarks>
+          schema:
+            maximum: 2147483647
+            minimum: 1
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+          example: "310"
+        - name: SeasonUid
+          in: query
+          description: Уникальный идентификатор сезона
+          schema:
+            type: string
+            format: uuid
+          example: B1D3B841-5716-11F0-9829-3CECEF730A49
+        - name: Year
+          in: query
+          description: Год сезона
+          schema:
+            maximum: 2070
+            minimum: 2011
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+          example: "2025"
+        - name: Date
+          in: query
+          description: >-
+            Конкретная дата. В выборку будут включены все матчи за выбранный
+            день.  
+
+            Чтобы указать часовой пояс, используйте параметр
+            <code>TimeZone</code>.
+          schema:
+            pattern: ^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$
+            type: string
+          example: 2025-06-02
+        - name: From
+          in: query
+          description: >-
+            Начальная дата. Если указана только дата без времени, то будут
+            включены все матчи за текущую дату, начиная с полуночи.
+
+            Если не указывается время с часовым поясом
+            (2025-06-17T14:23:30+02:00), то часовой пояс необходимо передать
+            отдельно в параметре <code>TimeZone</code><remarks>
+
+            Дата + время + часовой пояс: 2025-06-17T14:23:30+02:00  
+
+            Дата + время: 2025-06-17T14:23:30  
+
+            Дата + время (без секунд): 2025-06-17T14:23  
+
+            Дата: 2025-06-17</remarks>
+          schema:
+            type: string
+          example: 2025-06-17
+        - name: To
+          in: query
+          description: >-
+            Конечная дата. Фильтруются все матчи строго до этой даты. Если
+            указана только дата, без времени, то в выборку включаются все матчи
+            до полуночи указанной даты.
+
+            Для всех дат, где не указан часовой пояс (+02:00) необходимо указать
+            часовой пояс отдельно в параметре <code>TimeZone</code>
+
+            Например: если To = 2025-06-02, то в выборку попадут все матчи
+            до  2025-06-02 00:00:00. Т.е матчи за само 2025-06-02 уже выборку не
+            попадают
+
+            <remarks>
+
+            Дата + время + часовой пояс: 2025-06-18T14:23:30+02:00  
+
+            Дата + время: 2025-06-18T14:23:30  
+
+            Дата + время (без секунд): 2025-06-18T14:23  
+
+            Дата: 2025-06-18</remarks>
+          schema:
+            type: string
+          example: 2025-06-18
+        - name: Status
+          in: query
+          description: Статус (см [таблицу статусов](#tag/games/GET/Games/{id}))
+          schema:
+            maximum: 20
+            minimum: 1
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: uint8
+          example: "2"
+        - name: HomeTeam
+          in: query
+          description: Id команды хозяев (один, или несколько через запятую)
+          schema:
+            pattern: ^\d+(?:,\d+)*$
+            type: string
+          example: 18047,8045
+        - name: AwayTeam
+          in: query
+          description: Id команды гостей (один, или несколько через запятую)
+          schema:
+            pattern: ^\d+(?:,\d+)*$
+            type: string
+          example: 18047,8045
+        - name: Team
+          in: query
+          description: >-
+            Id одной из команд (один, или несколько через запятую).
+
+            <remarks>Если указано несколько Id, то выборку попадут все матчи,
+            где хотя бы одна из команд в это списке</remarks>
+          schema:
+            pattern: ^\d+(?:,\d+)*$
+            type: string
+          example: 18047,8045
+        - name: BothTeams
+          in: query
+          description: Id двух команд через запятую. Матчи двух команд между собой
+          schema:
+            pattern: ^\d+,\d+$
+            type: string
+          example: 18047,8045
+        - name: Ended
+          in: query
+          description: |-
+            Завершенные матчи (8, 9, 10, 17, 18).  
+            Учитывается только True, False не учитывается
+          schema:
+            type: boolean
+        - name: Live
+          in: query
+          description: |-
+            Лайв матчи (статусы 3, 4, 5, 6, 7, 11, 18, 19).
+            Учитывается только True, False не учитывается
+          schema:
+            type: boolean
+        - name: Upcoming
+          in: query
+          description: "Предстоящие матчи (дата начала матча больше текущего времени +
+            статус: 1,2). Учитывается только True, False не учитывается"
+          schema:
+            type: boolean
+        - name: Today
+          in: query
+          description: Матчи за сегодня. Учитывается только True, False не учитывается
+          schema:
+            type: boolean
+        - name: Offset
+          in: query
+          description: >-
+            Пропустить указанное количество матчей от начала выборки. По
+            умолчанию = 0
+
+            <remarks>
+
+            Количество матчей выводимое за раз ограничено лимитом 1000 матчей.
+            Чтобы извлечь остальные матчи, используется Offset c указанием
+            количества, которое надо пропустить
+
+            <code>offset=2000</code> - пропустить первые 2000 матчей и получить
+            следущие 1000
+
+            </remarks><example>2000</example>
+          schema:
+            maximum: 2147483647
+            minimum: 0
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+        - name: Limit
+          in: query
+          description: Ограничить выборку указанным количеством матчей (от 1 до 1000)
+          schema:
+            maximum: 1000
+            minimum: 1
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+        - name: Order
+          in: query
+          description: Сортировать по убыванию (Order=-1) или по возрастанию (Order=1)
+            даты начала матча
+          schema:
+            maximum: 1
+            minimum: -1
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+          example: "-1"
+        - name: TimeZone
+          in: query
+          description: Ваш часовой пояс (от -12 до 12). По умолчанию = 3
+          schema:
+            maximum: 12
+            minimum: -12
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+            default: 3
+          example: "3"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfApiSaGame[]"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfObject"
+  /Games/{id}:
+    get:
+      tags:
+        - Games
+      summary: Данные матча
+      description: >-
+        Получить полные данные о конкретном матче. 
+                    
+        Можно передать как числовой Id, использующийся в SStats.net так и
+        строковый Id с Flashscore.com
+                    
+        Полные данные о матче, включая:
+
+        - основная информация о матче (команды, счёт, статус, время)
+
+        - статистика матча (удары, владение мячом, угловые и т.д.)
+
+        - стартовые составы и тактические схемы команд
+
+        - список игроков в составах с позициями
+
+        - индивидуальная статистика игроков
+
+        - события матча (голы, замены, карточки)
+
+        - информация о стадионе, судье
+
+        - доматчевые коэффициенты закрытия в сокращенном варианте. ([Все
+        коэффициенты здесь](#tag/odds/GET/Odds/{gameId}))
+                    
+        ### Частота обновления данных
+                    
+        | Тип матча                        | Частота обновления       |
+
+        |---------------------------------|--------------------------|
+
+        | Лайв (идущие сейчас)            | каждую минуту            |
+
+        | Недавние (последние сутки)      | каждые 15 минут          |
+
+        | Доматчевые (до 30 дней назад)   | раз в сутки              |
+                    
+        ### Статусы матча
+
+
+        | Код | Описание                             |
+
+        |-----| -------------------------------------|
+
+        | 1   | Дата матча ещё не объявлена          |
+
+        | 2   | Матч ещё не начался                  |
+
+        | 3   | Начало первого тайма                 |
+
+        | 4   | Перерыв между таймами                |
+
+        | 5   | Начало второго тайма                 |
+
+        | 6   | Дополнительное время                 |
+
+        | 7   | Идёт серия пенальти                  |
+
+        | 8   | Матч завершён                        |
+
+        | 9   | Матч завершён после доп. времени     |
+
+        | 10  | Матч завершён после серии пенальти   |
+
+        | 11  | Перерыв в дополнительном времени     |
+
+        | 12  | Матч приостановлен                   |
+
+        | 13  | Матч прерван                         |
+
+        | 14  | Матч перенесён                       |
+
+        | 15  | Матч отменён                         |
+
+        | 17  | Техническое поражение                |
+
+        | 18  | Победа без игры (соперник не явился) |
+
+        | 19  | Матч в процессе                      |
+      parameters:
+        - name: id
+          in: path
+          description: sstats.net ID или Flashscore ID
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfApiSaGameFull"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfObject"
+  /Games/glicko/{id}:
+    get:
+      tags:
+        - Games
+      summary: Glicko 2
+      description: Рейтинг Glicko 2 и предсказание вероятностей победы команд
+      parameters:
+        - name: id
+          in: path
+          description: Id матча. Sstats Id в виде числа или Flashscore Id в виде строки
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfApiGameGlicko"
+  /Games/query:
+    post:
+      tags:
+        - Games
+      summary: Расширенный поиск
+      description: >-
+        Извлечение матчей на основе сложных многоуровневых логических условий. 
+                    
+        Условие использует SQL подобный синтаксис. Сложные выражения
+        поддерживаются в выводимых полях (Fields), в условии (Condition) и
+        сортировке (Order)
+                    
+        [Подробное руководство](https://sstats.net/posts/api-query-games-2)
+
+
+        Пример условия:  
+
+        <code>LeagueId = 39 AND (Year = 2023 OR Year = 2024) AND Winner1 > 1.1
+        AND Winner1 <= 1.3</code>  
+
+        Этот запрос выводит все матчи лиги с идентификатором 30 (Английская
+        премьер лига) в сезонах 2023 и 2024,
+
+        у которых коэффициент на победу команды хозяев находится в промежутке от
+        1.1 до 1.3 (включительно)
+                    
+
+                    
+        **Field** настраивает выводимые поля  
+
+        **Order** настраивает поля сортировки
+                    
+
+        Запрос отправляется в формате POST c типом application/json, в теле
+        которого содержится json с указанным объектом
+                    
+        #### Подробное руководство по продвинутым запросам [➔
+        Перейти](https://sstats.net/posts/api-query-games-2)
+
+        ---
+
+
+        Пример содержимого body запроса:  
+
+        ```json
+
+        {
+            "Condition" : "LeagueId = 39 AND (Year = 2023 OR Year = 2024) AND Winner1 > 1.1 AND Winner1 <= 1.3",
+            "Fields" : ["Id","Date","HomeTeamName","AwayTeamName","ScoreHomeFT","ScoreAwayFT", "Winner1", "WinnerX", "Winner2"],
+            "Order" : "Date DESC"
+            "Format" : "csv"
+        }
+
+        ``` 
+      parameters:
+        - name: timeZone
+          in: query
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+            default: 3
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QueryGamesRequest"
+          text/json:
+            schema:
+              $ref: "#/components/schemas/QueryGamesRequest"
+          application/*+json:
+            schema:
+              $ref: "#/components/schemas/QueryGamesRequest"
+        required: true
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json: {}
+            text/csv: {}
+  /Games/season-table:
+    get:
+      tags:
+        - Games
+      summary: Рейтинговая таблица
+      description: >-
+        Возвращает рейтинговую таблицу команд указанной лиги.
+
+        Рейтинговая таблица похожа на обычную турнирную таблицу, но учитывает
+        все матчи всех групп суммарно, либо может учитывать несколько сезонов.
+
+        Т.е это не официальная турнирная таблица, а вычисляемая, с возможностью
+        настройки количества матчей.
+
+        Официальная турнирная таблица здесь:
+        [/seasons/standings](#tag/seasons/GET/Seasons/standings)
+                    
+        Таблица формируется на основе результатов завершенных матчей и включает
+        статистику команд:
+
+        - Позицию в турнире
+
+        - Количество игр, побед, ничьих, поражений
+
+        - Забитые и пропущенные голы
+
+        - Очки и другие показатели
+
+
+        **Форматы ответа:**
+
+        - `JSON` (по умолчанию) - структурированные данные для программного
+        использования
+
+        - `CSV` - табличный формат для экспорта в Excel или другие приложения
+
+
+        **Дополнительные возможности:**
+
+        - Ограничение количества записей через параметр `limit`
+
+        - Выбор конкретных полей для CSV через параметр `fields`
+
+        - Сортировка по любому полю через параметр `orderField`
+                    
+        **Доступные поля для параметра `fields`:**
+
+
+        | Название | Описание |
+
+        |----------|----------|
+
+        | TeamId | ID команды |
+
+        | TeamName | Название команды |
+
+        | TotalGames | Всего игр |
+
+        | Wins | Победы |
+
+        | Draws | Ничьи |
+
+        | Loss | Поражения |
+
+        | GoalsScored | Забитые голы |
+
+        | GoalsMissed | Пропущенные голы |
+
+        | Points | Очки |
+
+        | Over25TotalGames | Игры с тоталом больше 2.5 |
+
+        | Under25TotalGames | Игры с тоталом меньше 2.5 |
+
+        | Over25TotalHomeGames | Домашние игры с тоталом больше 2.5 |
+
+        | Under25TotalHomeGames | Домашние игры с тоталом меньше 2.5 |
+
+        | Over25TotalAwayGames | Гостевые игры с тоталом больше 2.5 |
+
+        | Under25TotalAwayGames | Гостевые игры с тоталом меньше 2.5 |
+
+        | HomeGames | Домашние игры |
+
+        | AwayGames | Гостевые игры |
+
+        | HomeWins | Домашние победы |
+
+        | AwayWins | Гостевые победы |
+
+        | HomeDraws | Домашние ничьи |
+
+        | AwayDraws | Гостевые ничьи |
+
+        | HomeLoss | Домашние поражения |
+
+        | AwayLoss | Гостевые поражения |
+
+        | HomeScored | Голы в домашних играх |
+
+        | AwayScored | Голы в гостевых играх |
+
+        | HomeMissed | Пропущенные голы в домашних играх |
+
+        | AwayMissed | Пропущенные голы в гостевых играх |
+
+        | HomePoints | Очки в домашних играх |
+
+        | AwayPoints | Очки в гостевых играх |
+
+        | ScoreDiff | Разность голов |
+
+        | ScoreDiffHome | Разность голов в домашних играх |
+
+        | ScoreDiffAway | Разность голов в гостевых играх |
+
+        | Rank | Место в турнирной таблице |
+
+        | HomeRank | Место в домашней таблице |
+      parameters:
+        - name: league
+          in: query
+          description: Идентификатор лиги/турнира
+          required: true
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+        - name: year
+          in: query
+          description: Год сезона
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+        - name: limit
+          in: query
+          description: Максимальное количество матчей для расчета таблицы (0 = без
+            ограничений)
+          schema:
+            maximum: 1000
+            minimum: 5
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+            default: 1000
+        - name: format
+          in: query
+          description: 'Формат ответа: "json" (по умолчанию) или "csv"'
+          schema:
+            type: string
+            default: json
+        - name: fields
+          in: query
+          description: 'Список полей через запятую для CSV формата (например:
+            "TeamName,Points,Wins")'
+          schema:
+            type: string
+        - name: orderField
+          in: query
+          description: Поле для сортировки. Для убывающей сортировки добавьте "-" перед
+            названием поля
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfRankTable"
+            text/csv:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfRankTable"
+  /Games/last-games-stats:
+    get:
+      tags:
+        - Games
+      summary: Предматчевая статистика команд
+      description: >-
+        Возвращает усреднённые показатели **обеих команд** за их последние N
+        матчей, сыгранных **до даты** указанного матча.
+                    
+        > **Важно:** метод принимает `gameId` — идентификатор конкретного
+        **матча**, а не команды.
+
+        > Статистика всегда рассчитывается в контексте этого матча: берутся
+        команды-участники и их завершенные матчи.
+                    
+        ### Что возвращается
+
+        Два объекта — `home` (хозяева) и `away` (гости) — каждый содержит:
+
+        - **Голы:** среднее забитых и пропущенных
+
+        - **xG:** среднее xG и xG против (из коэффициентов), MAE и RMSE
+
+        - **Удары, угловые, офсайды, карточки** — средние за и против
+
+        - **Коэффициенты:** средние на победу / ничью / поражение
+
+        - **Форма:** количество побед, ничьих, поражений и `gamesCount`
+                    
+        ### Фильтрация выборки
+
+        По умолчанию берутся все матчи команды из любых лиг и сезонов.
+
+        Параметры `sameLeague`, `sameSeason` и `homeAway` позволяют сузить
+        выборку.
+
+        Если после фильтрации у одной из команд меньше 5 матчей — метод вернёт
+        ошибку.
+      parameters:
+        - name: gameId
+          in: query
+          description: Id матча, для которого рассчитывается статистика
+          required: true
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+        - name: limit
+          in: query
+          description: Количество последних матчей для расчёта (от 5 до 100). По умолчанию
+            25
+          schema:
+            maximum: 100
+            minimum: 5
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+            default: 25
+        - name: sameLeague
+          in: query
+          description: Учитывать только матчи в той же лиге, что и матч `gameId`
+          schema:
+            type: boolean
+            default: false
+        - name: sameSeason
+          in: query
+          description: Учитывать только матчи в том же сезоне и лиге, что и матч `gameId`
+          schema:
+            type: boolean
+            default: false
+        - name: homeAway
+          in: query
+          description: Для хозяев — только домашние матчи; для гостей — только выездные
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json: {}
+  /Games/text-summary:
+    get:
+      tags:
+        - Games
+      summary: Текстовая сводка
+      description: >-
+        Генерирует детальную текстовую сводку по футбольному матчу, включающую:
+
+
+        - **Букмекерские коэффициенты** на все основные исходы (победа, ничья,
+        тоталы)
+
+        - **Ожидаемые голы** (xG) по оценкам букмекеров
+
+        - **Анализ прибыльности** различных типов ставок на основе исторических
+        данных
+
+        - **Статистику команд**: проценты побед/ничьих/поражений, средние
+        коэффициенты
+
+        - **Голевую статистику**: среднее количество забитых/пропущенных голов,
+        точность прогнозов букмекеров
+
+
+        Анализ основан на предыдущих матчах команд с возможностью фильтрации по
+        лиге и типу матчей (дома/в гостях).
+      parameters:
+        - name: id
+          in: query
+          description: Уникальный идентификатор футбольного матча
+          required: true
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+        - name: limit
+          in: query
+          description: Лимит количества последних матчей (от 5 до 30). 25 - по умолчанию
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+            default: 25
+        - name: sameLeague
+          in: query
+          description: Учитывать только матчи из той же лиги что и анализируемый матч (по
+            умолчанию true)
+          schema:
+            type: boolean
+            default: true
+        - name: homeAway
+          in: query
+          description: Учитывать только домашние матчи для хозяев и гостевые для гостей
+            (по умолчанию false)
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: Текстовая сводка с детальной статистикой и коэффициентами по матчу
+          content:
+            application/json: {}
+            text/plain: {}
+  /Games/profits:
+    get:
+      tags:
+        - Games
+      summary: Калькуляция прибыли
+      description: >-
+        **Калькуляция прибыли по видам ставок**
+
+
+        Анализирует историческую прибыльность различных видов ставок для
+        домашней и выездной команд на основе их предыдущих матчей.
+
+
+        Метод возвращает детальную статистику по прибыльности ставок:
+
+        - **Полный матч** - анализ ставок за весь матч
+
+        - **Первый тайм** - анализ ставок за первую половину
+
+        - **Второй тайм** - анализ ставок за вторую половину
+
+
+        Для каждого типа ставок показывается:
+
+        - Общая прибыль/убыток
+
+        - История изменения прибыли
+
+        - Количество проанализированных игр
+
+        - Количество выигрышных ставок
+
+
+        Поддерживается гибкая фильтрация исторических данных для более точного
+        анализа.
+      parameters:
+        - name: gameId
+          in: query
+          description: Уникальный идентификатор матча для анализа
+          required: true
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+        - name: thisLeague
+          in: query
+          description: "Учитывать только игры в рамках той же лиги (по умолчанию: false)"
+          schema:
+            type: boolean
+            default: false
+        - name: homeAway
+          in: query
+          description: "Учитывать только домашние игры для домашней команды и выездные для
+            выездной (по умолчанию: false)"
+          schema:
+            type: boolean
+            default: false
+        - name: sameGames
+          in: query
+          description: "Учитывать только игры с похожими показателями xG (expected goals)
+            - разница не более 0.2 (по умолчанию: false)"
+          schema:
+            type: boolean
+            default: false
+        - name: bookieId
+          in: query
+          description: Идентификатор конкретного букмекера для анализа коэффициентов
+            (опционально)
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+        - name: limit
+          in: query
+          description: "Максимальное количество предыдущих игр для анализа (по умолчанию:
+            25, диапазон: 5-100)"
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+            default: 25
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfApiMatchProfit"
+  /Games/injuries:
+    get:
+      tags:
+        - Games
+      summary: Игроки пропускающие матч
+      description: >-
+        Игроки не заявленные на матч из-за травмы или дисквалификаций
+                    
+        Типы `Red Card`, `Yellow Card` означают пропуск игроком матча из-за
+        перебора карточек
+      parameters:
+        - name: gameId
+          in: query
+          description: Идентификатор матча
+          required: true
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ApiSaInjury"
+  /Leagues:
+    get:
+      tags:
+        - Leagues
+      summary: Список
+      description: Список всех лиг и их сезонов
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfApiSaLeagueWithSeasons[]"
+  /Ls/List:
+    get:
+      tags:
+        - Ls
+      summary: Список матчей
+      description: >-
+        Получение списка футбольных матчей с гибкими возможностями фильтрации и
+        сортировки.
+
+
+        **Основные возможности:**
+
+        - Поиск по конкретным матчам, лигам, сезонам и командам
+
+        - Фильтрация по временным периодам (конкретная дата или диапазон)
+
+        - Отбор матчей по статусу: завершенные, текущие (лайв) или предстоящие
+
+        - Пагинация результатов (до 1000 матчей за запрос)
+
+        - Сортировка по дате проведения матча
+
+
+        **Примеры использования:**
+
+        - `?Date=2025-06-21` - все матчи за конкретный день
+
+        - `?From=2025-06-01&To=2025-06-30` - матчи за период
+
+        - `?LeagueId=england/premier-league&Ended=true` - завершенные матчи лиги
+
+        - `?Team=arsenal/hA1Zm19f&Live=true` - текущие матчи команды
+
+        - `?BothTeams=villa/ALztxK6e,chelsea/4fGZN2oK` - матчи между двумя
+        командами
+
+
+        ⚠️ **Обязательно** укажите хотя бы один параметр фильтрации, иначе
+        запрос будет отклонен.
+                    
+         #### Статусы матча
+        | Id | Название |
+
+        |----|----------|
+
+        | 1 | Не начался |
+
+        | 45 | К завершению |
+
+        | 42 | Ожидание обновлений |
+
+        | 2 | В прямом эфире |
+
+        | 12 | Первый тайм |
+
+        | 13 | Второй тайм |
+
+        | 6 | Дополнительное время |
+
+        | 7 | Пенальти |
+
+        | 46 | Технический перерыв |
+
+        | 3 | Завершён |
+
+        | 10 | После дополнительного времени |
+
+        | 11 | После пенальти |
+
+        | 9 | Техническая победа |
+
+        | 43 | Отложен |
+
+        | 36 | Прерван |
+
+        | 5 | Отменён |
+
+        | 54 | Присуждён |
+      parameters:
+        - name: Id
+          in: query
+          description: Id матча. Один или несколько через запятую.
+          schema:
+            maxLength: 300
+            pattern: ^\w+(?:,\w+)*$
+            type: string
+          example: '"000agg7D или 000agg7D,zZKMD6Z6"'
+        - name: LeagueId
+          in: query
+          description: >-
+            Id лиги
+
+            <remarks>Список лиг можно получить через
+            <code>/Ls/Leagues</code></remarks>
+          schema:
+            maxLength: 255
+            type: string
+        - name: SeasonId
+          in: query
+          description: Уникальный идентификатор сезона
+          schema:
+            type: string
+        - name: Years
+          in: query
+          description: "Года сезона (Например: 2024-2025)"
+          schema:
+            type: string
+          example: '"2024-2025"'
+        - name: Date
+          in: query
+          description: >-
+            Конкретная дата. В выборку будут включены все матчи за выбранный
+            день. Чтобы указать часовой пояс, используйте параметр
+            <code>TimeZone</code>.
+
+            <example>2025-06-02</example>
+          schema:
+            type: string
+            format: date
+        - name: From
+          in: query
+          description: >-
+            Начальная дата. Если указана только дата без времени, то будут
+            включены все матчи за текущую дату, начиная с полуночи.
+
+            Если не указывается время с часовым поясом
+            (2025-06-17T14:23:30+02:00), то часовой пояс необходимо передать
+            отдельно в параметре <code>TimeZone</code><remarks>
+
+            Дата + время + часовой пояс: 2025-06-17T14:23:30+02:00 
+
+            Дата + время: 2025-06-17T14:23:30
+
+            Дата + время (без секунд): 2025-06-17T14:23
+
+            Дата: 2025-06-17</remarks>
+          schema:
+            type: string
+        - name: To
+          in: query
+          description: >-
+            Конечная дата. Фильтруются все матчи строго до этой даты. Если
+            указана только дата, без времени, то в выборку включаются все матчи
+            до полуночи указанной даты.
+
+            Для всех дат, где не указан часовой пояс (+02:00) необходимо указать
+            часовой пояс отдельно в параметре <code>TimeZone</code>
+
+            Например: если To = 2025-06-02, то в выборку попадут все матчи
+            до  2025-06-02 00:00:00. Т.е матчи за само 2025-06-02 уже выборку не
+            попадают
+
+            <remarks>
+
+            Дата + время + часовой пояс: 2025-06-17T14:23:30+02:00 
+
+            Дата + время: 2025-06-17T14:23:30
+
+            Дата + время (без секунд): 2025-06-17T14:23
+
+            Дата: 2025-06-17</remarks>
+          schema:
+            type: string
+        - name: Status
+          in: query
+          description: Статус
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: uint8
+        - name: HomeTeam
+          in: query
+          description: >-
+            Id команды хозяев (один, или несколько через запятую)
+
+            <example>"jk-arsenal/MgkAqSU0 или
+            jk-arsenal/MgkAqSU0,villa/ALztxK6e"</example>
+          schema:
+            maxLength: 300
+            pattern: ^[\w\/\-]+(?:,[\w\/\-]+)*$
+            type: string
+        - name: AwayTeam
+          in: query
+          description: |-
+            Id команды гостей (один, или несколько через запятую)
+            <example>"123 или 123,456"</example>
+          schema:
+            pattern: ^[\w\/\-]+(?:,[\w\/\-]+)*$
+            type: string
+        - name: Team
+          in: query
+          description: >-
+            Id одной из команд (один, или несколько через запятую).
+
+            <remarks>Если указано несколько Id, то выборку попадут все матчи,
+            где хотя бы одна из команд в это списке</remarks><example>"123 или
+            123,456"</example>
+          schema:
+            pattern: ^[\w\/\-]+(?:,[\w\/\-]+)*$
+            type: string
+        - name: BothTeams
+          in: query
+          description: |-
+            Id двух команд через запятую. Матчи двух команд между собой
+            <example>"123,456"</example>
+          schema:
+            pattern: ^[\w\/\-]+(?:,[\w\/\-]+)*$
+            type: string
+        - name: Ended
+          in: query
+          description: Завершенные матчи (8, 9, 10, 17, 18)
+          schema:
+            type: boolean
+        - name: Live
+          in: query
+          description: Лайв матчи (статусы 3, 4, 5, 6, 7, 11, 18, 19)
+          schema:
+            type: boolean
+        - name: Upcoming
+          in: query
+          description: "Предстоящие матчи (дата начала матча больше текущего времени +
+            статус: 1,2)"
+          schema:
+            type: boolean
+        - name: Offset
+          in: query
+          description: >-
+            Пропустить указанное количество матчей от начала выборки. По
+            умолчанию = 0
+
+            <remarks>
+
+            Количество матчей выводимое за раз ограничено лимитом 1000 матчей.
+            Чтобы извлечь остальные матчи, используется Offset c указанием
+            количества, которое надо пропустить.
+
+            <code>offset=2000</code> - пропустить первые 2000 матчей и получить
+            следущие 1000
+
+            </remarks><example>2000</example>
+          schema:
+            maximum: 2147483647
+            minimum: 0
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+        - name: Limit
+          in: query
+          description: Ограничить выборку указанным количеством матчей (от 1 до 1000)
+          schema:
+            maximum: 1000
+            minimum: 1
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+        - name: Order
+          in: query
+          description: Сортировать по убыванию (Order=-1) или по возрастанию (Order=1)
+            даты начала матча
+          schema:
+            maximum: 1
+            minimum: -1
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+        - name: TimeZone
+          in: query
+          description: Ваш часовой пояс (от -12 до 12). По умолчанию = 3
+          schema:
+            maximum: 12
+            minimum: -12
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+            default: 3
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+  /Ls/Teams:
+    get:
+      tags:
+        - Ls
+      summary: Команды
+      description: >-
+        Поиск команды по заданным критериям поиска.
+
+
+        **Параметры поиска:**
+
+        - Поиск выполняется по одному из параметров в порядке приоритета: `uid`
+        → `id` → `name`
+
+        - При поиске по названию используется частичное совпадение (содержит
+        указанную строку)
+
+        - Возвращается максимум 100 команд
+
+
+        **Обязательные условия:**
+
+        - Должен быть указан хотя бы один из параметров поиска
+      parameters:
+        - name: uid
+          in: query
+          description: Уникальный идентификатор команды (GUID). Имеет наивысший приоритет
+            при поиске
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: query
+          description: Строковый идентификатор команды. Используется если не указан uid
+          schema:
+            type: string
+        - name: name
+          in: query
+          description: Название команды или его часть для поиска. Используется если не
+            указаны uid и id
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+  /Ls/Leagues:
+    get:
+      tags:
+        - Ls
+      summary: Лиги
+      description: >-
+        Получение списка футбольных лиг с возможностью фильтрации по различным
+        критериям.
+
+
+        **Варианты использования:**
+
+        - Без параметров - возвращает все доступные лиги
+
+        - По GUID - получение конкретной лиги (приоритетный поиск)
+
+        - По ID - поиск лиги по строковому идентификатору  
+
+        - По названию - поиск лиг, содержащих указанную подстроку (регистр не
+        учитывается)
+
+
+        **Приоритет фильтров:** GUID > ID > название
+
+
+        Если указан GUID, остальные параметры игнорируются. Фильтры по ID и
+        названию могут применяться совместно.
+      parameters:
+        - name: guid
+          in: query
+          description: Уникальный идентификатор лиги (GUID). При указании возвращается
+            только одна конкретная лига
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: query
+          description: Строковый идентификатор лиги для точного поиска
+          schema:
+            type: string
+        - name: name
+          in: query
+          description: Часть названия лиги для поиска (поиск по подстроке, регистр не
+            учитывается)
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+  /Ls/Seasons:
+    get:
+      tags:
+        - Ls
+      summary: Сезоны
+      description: >-
+        Возвращает список всех сезонов для указанной футбольной лиги.
+
+
+        Метод позволяет получить информацию о сезонах, используя один из двух
+        способов идентификации лиги:
+
+        - По уникальному идентификатору (`leagueUid`) 
+
+        - По строковому идентификатору (`leagueId`)
+
+
+        **Примечание:** Необходимо указать хотя бы один из параметров
+        идентификации лиги.
+      parameters:
+        - name: leagueUid
+          in: query
+          description: Уникальный идентификатор лиги в формате GUID
+          schema:
+            type: string
+            format: uuid
+        - name: leagueId
+          in: query
+          description: Строковый идентификатор лиги (альтернатива leagueUid)
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+  /Ls/GameInfo:
+    get:
+      tags:
+        - Ls
+      summary: Матч
+      description: >-
+        Возвращает детальную информацию о футбольном матче по его
+        идентификатору.
+
+
+        **Включает:**
+
+        - Основные данные матча (команды, счет, статус, время)
+
+        - Букмекерские коэффициенты (если доступны)
+
+        - События матча (голы, карточки, замены и др.)
+
+
+        **Примеры использования:**
+
+        - Отображение подробной информации о матче в приложении
+
+        - Получение актуальных коэффициентов для ставок
+
+        - Просмотр хронологии событий матча
+      parameters:
+        - name: id
+          in: query
+          description: Уникальный идентификатор футбольного матча
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Объект с полной информацией о матче или сообщение об ошибке, если
+            матч не найден
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+  /Odds/bookmakers:
+    get:
+      tags:
+        - Odds
+      summary: Букмекеры
+      description: Справочник букмекеров и их идентификаторов
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfApiSaBookmaker[]"
+  /Odds/{gameId}:
+    get:
+      tags:
+        - Odds
+      summary: Доматчевые коэффициенты
+      description: >-
+        Полный список всех коэффициентов всех букмекеров.
+                    
+        По умолчанию возвращаются коэффициенты закрытия (за несколько минут
+        (15-30) до начала матча)
+      parameters:
+        - name: gameId
+          in: path
+          description: ""
+          required: true
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type: integer
+            format: int32
+        - name: bookmakerId
+          in: query
+          description: "идентификатор букмекера (один или несколько, через запятую).
+            Например: <code>4,5</code>"
+          schema:
+            type: string
+        - name: opening
+          in: query
+          description: коэффициенты открытия
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfApiSaBookmakerOdds[]"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+  /Odds/live/{gameId}:
+    get:
+      tags:
+        - Odds
+      summary: Live коэффициенты
+      description: >-
+        Коэффициенты актуальные в реальном времени, либо последнее обновление на
+        конец матча
+                    
+        Букмекер: Bet365
+                    
+        Лайв коэффициенты обновляются раз в 5-60 секунд
+                    
+        Чтобы за раз отслеживать все матчи, где изменились коэффициенты,
+        используйте
+        [/updates-only](#tag/odds/GET/Odds/live-changes/{gameId}/updates-only)
+      parameters:
+        - name: gameId
+          in: path
+          description: Идентификатор матча
+          required: true
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type: integer
+            format: int32
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfApiSaLiveOdds"
+  /Odds/live-changes/updates-only:
+    get:
+      tags:
+        - Odds
+      summary: Метки live обновлений
+      description: >-
+        Время последнего обновления (актуальности) Live коэффициентов
+                    
+        Передайте список Id матчей через запятую.
+
+        Например: `1100303,1100304`. (Максимально 100 матчей)
+                    
+        Возвращается Id матча и время последнего обновления Live коэффициентов
+                    
+        Используйте этот метод вместе с
+        [odds/live-changes](#tag/odds/GET/Odds/live-changes/{gameId}) чтобы
+        извлекать весь список коэффициентов только по необходимости
+                    
+        Лайв коэффициенты обновляются раз в 5-60 секунд
+      parameters:
+        - name: gameId
+          in: query
+          description: идентификатор матча (один или несколько через запятую)
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfApiLiveOddsLastUpdate[]"
+  /Odds/live-changes/{gameId}:
+    get:
+      tags:
+        - Odds
+      summary: "История Live коэффициентов "
+      description: >-
+        История изменений Live коэффициентов во время матча
+
+
+        Букмекер: Bet365
+
+
+        **Примечание**  
+
+        В заголовках ответа возвращается `Last-Modified`, который содержит время
+        последнего изменения коэффициентов.
+
+        Используйте его что не выкачивать содержимое понапрасну
+
+
+        Чтобы за раз отслеживать все матчи, где изменились коэффициенты,
+        используйте
+        [/updates-only](#tag/odds/GET/Odds/live-changes/{gameId}/updates-only)
+      parameters:
+        - name: gameId
+          in: path
+          description: Id матча
+          required: true
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type: integer
+            format: int32
+        - name: markets
+          in: query
+          description: Id рынка (один или несколько через запятую)
+          schema:
+            type: string
+        - name: outcomes
+          in: query
+          description: Id исхода (один или несколько через запятую)
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfApiMarketChangeHistory[]"
+  /Odds/prematch-markets:
+    get:
+      tags:
+        - Odds
+      summary: Типы доматчевых ставок
+      description: >-
+        Справочинк видов ставок для доматчевых коэффициентов (получаемыйх черех
+        [/odds](#tag/odds/GET/Odds/{gameId})
+
+        Эти виды ставок используются как `MarketId`
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+  /Odds/live-markets:
+    get:
+      tags:
+        - Odds
+      summary: Типы Live ставок
+      description: >-
+        Справочинк видов ставок для Live коэффициентов (получаемыйх черех
+        [/odds/live](#tag/odds/GET/Odds/live/{gameId})
+
+        Эти виды ставок используются как `MarketId`
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+  /Pari/countries:
+    get:
+      tags:
+        - Pari
+      summary: Список стран
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfApiPariCountry[]"
+  /Pari/leagues:
+    get:
+      tags:
+        - Pari
+      summary: Список лиг
+      description: >-
+        Список всех лиг в таком же формате, как и на сайте pari.ru
+
+        Если у лиги нет страны, значит она относится к международным
+
+        Чтобы отфильтровать только международные лиги, нужно передать countryId
+        = 0
+                    
+        Запрос не возвращает все лиги за раз. Используйте пагинацию
+      parameters:
+        - name: countryId
+          in: query
+          description: Id страны (из эндпоинта /countries). 0 - для международных
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+        - name: offset
+          in: query
+          description: Смещение (для пагинации)
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+            default: 0
+        - name: limit
+          in: query
+          description: Максимальное количество лиг в ответе
+          schema:
+            maximum: 1000
+            minimum: 1
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+            default: 1000
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfApiPariTournament[]"
+  /Pari/league/{id}:
+    get:
+      tags:
+        - Pari
+      summary: Лига
+      description: Данные по конкретной лиге
+      parameters:
+        - name: id
+          in: path
+          description: ""
+          required: true
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type: integer
+            format: int32
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfApiPariTournament"
+  /Pari/matches:
+    get:
+      tags:
+        - Pari
+      summary: Список матчей
+      description: >-
+        Должен быть указан хотя бы один фильтр.
+
+        Параметры live и upcoming можно комбинировать — тогда возвращаются матчи
+        с любым из указанных статусов.
+
+        Параметр date имеет приоритет над dateFrom/dateTo.
+
+
+        **Формат дат:** `YYYY-MM-DD`. Время и часовой пояс игнорируются —
+        фильтрация всегда по дню UTC.
+
+
+        **Пример — матчи за сегодня (2026-05-01):**
+
+        ```
+
+        GET /pari/matches?date=2026-05-01
+
+        ```
+
+
+        Рекомендуется всегда указывать дату (только если не передан live). Так
+        данные будут извлекаться быстрее 
+
+
+        **Сортировка**: Если заданы даты, или live или upcoming, то сортировка
+        по возрастанию. Иначе по убыванию
+
+
+        ---
+
+
+        ## Пагинация (постраничная загрузка)
+
+
+        Метод **никогда не возвращает все матчи сразу** — только срез размером
+        `limit` начиная с позиции `offset`.
+
+        Это сделано специально, чтобы не перегружать клиент и канал при большом
+        количестве данных.
+
+
+        В ответе всегда есть поле `totalCount` — общее количество матчей,
+        удовлетворяющих фильтру.
+
+        Сравнивайте его с количеством уже полученных записей, чтобы понять — все
+        ли данные загружены.
+
+
+        **Алгоритм получения всех данных:**
+
+
+        1. Первый запрос: `offset=0&limit=100` — получаете первые 100 матчей и
+        значение `totalCount`.
+
+        2. Если `totalCount > 100`, делаете следующий запрос:
+        `offset=100&limit=100`.
+
+        3. Продолжаете увеличивать `offset` на `limit` до тех пор, пока `offset
+        >= totalCount`.
+
+
+        **Пример — загрузить все матчи за день (предположим, их 250):**
+
+        ```
+
+        GET /pari/matches?date=2026-05-01&offset=0&limit=100   → получено
+        100,  totalCount=250
+
+        GET /pari/matches?date=2026-05-01&offset=100&limit=100 → получено
+        100,  totalCount=250
+
+        GET /pari/matches?date=2026-05-01&offset=200&limit=100 → получено
+        50,   totalCount=250
+
+        ```
+
+        После третьего запроса `offset(200) + полученных(50) = 250 = totalCount`
+        — все данные получены.
+
+
+        **Советы:**
+
+        - Максимальный `limit` — **1000**. Увеличивайте его, чтобы уменьшить
+        число запросов.
+
+        - Коэффициенты в списке матчей возвращаются в легком формате `{ id,
+        value }`. Названия исходов можно получить через
+        `/pari/odds/market-types`.
+
+        - Не меняйте фильтры и порядок сортировки между запросами одной серии —
+        иначе страницы не совпадут.
+      parameters:
+        - name: countryId
+          in: query
+          description: Id страны из списка [/pari/countries](#tag/pari/GET/Pari/countries)
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+        - name: leagueId
+          in: query
+          description: Id лиги (из эндпоинта /leagues или сайта Pari.ru)
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+        - name: date
+          in: query
+          description: "Конкретный день. Формат: YYYY-MM-DD (например, 2026-05-01). Если
+            указан, dateFrom и dateTo игнорируются"
+          schema:
+            type: string
+            format: date-time
+        - name: dateFrom
+          in: query
+          description: "Начало диапазона дат включительно. Формат: YYYY-MM-DD"
+          schema:
+            type: string
+            format: date-time
+        - name: dateTo
+          in: query
+          description: "Конец диапазона дат включительно. Формат: YYYY-MM-DD"
+          schema:
+            type: string
+            format: date-time
+        - name: teamId
+          in: query
+          description: Id команды
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+        - name: live
+          in: query
+          description: Только лайв матчи (статус Live и WillStartSoon)
+          schema:
+            type: boolean
+        - name: upcoming
+          in: query
+          description: Только предстоящие матчи (статус NotStarted)
+          schema:
+            type: boolean
+        - name: sortDesc
+          in: query
+          description: "Явное управление сортировкой: true — по убыванию StartDate, false
+            — по возрастанию. Если не указан, направление выбирается
+            автоматически"
+          schema:
+            type: boolean
+        - name: includeOdds
+          in: query
+          description: Если true, возвращает актуальные коэффициенты для матчей в формате
+            id/value
+          schema:
+            type: boolean
+            default: false
+        - name: showDeleted
+          in: query
+          description: Показывать матчи, удаленны из линии ещё до их начала
+          schema:
+            type: boolean
+            default: false
+        - name: timezone
+          in: query
+          description: UTC offset в часах (например, 3 = Москва). Сдвигает границы дат при
+            фильтрации по date/dateFrom/dateTo
+          schema:
+            maximum: 12
+            minimum: -12
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+            default: 3
+        - name: offset
+          in: query
+          description: "Сколько записей пропустить от начала выборки. Для первого запроса
+            — 0. Для следующей страницы прибавьте к offset значение limit
+            (например, 0 → 100 → 200). По умолчанию: 0"
+          schema:
+            maximum: 2147483647
+            minimum: 0
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+            default: 0
+        - name: limit
+          in: query
+          description: "Максимальное количество записей в ответе. По умолчанию: 100.
+            Максимум: 1000, или 200 при includeOdds=true. Сравните количество
+            полученных записей с полем totalCount в ответе, чтобы понять, есть
+            ли ещё данные"
+          schema:
+            maximum: 1000
+            minimum: 1
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+            default: 100
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfApiPariMatch[]"
+  /Pari/match/{eventId}:
+    get:
+      tags:
+        - Pari
+      summary: Данные матча
+      description: >-
+        Самые актуальные на данный момент данные по матчу
+                    
+        Обновление данных: раз в 3 секунды
+                    
+        ## Логика заполнения коэффициентов
+                    
+        - **Матч ещё не начался** — актуальные доматчевые коэффициенты
+        возвращаются в `currentOdds`, поле `prematchOdds` пустое.
+
+        - **Матч идёт (лайв)** — в `currentOdds` лайв-коэффициенты, в
+        `prematchOdds` — последние доматчевые значения (последние коэффициенты
+        до того как матч получил статус Live).
+
+        - **Матч завершён** — `currentOdds` пустое, в `prematchOdds` остаются
+        последние доматчевые коэффициенты.
+      parameters:
+        - name: eventId
+          in: path
+          description: Id события на сайте pari.ru
+          required: true
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type: integer
+            format: int32
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfApiPariMatch"
+  /Pari/odds/history/{eventId}:
+    get:
+      tags:
+        - Pari
+      summary: История коэффициентов
+      description: >-
+        История изменения коэффициентов (доматчевые и лайв)
+                    
+        Коэффициент может быть заблокирован (IsBlocked), это значит на него
+        нельзя поставить в данный момент, но при этом его значения могут
+        обновляться.
+
+        Помимо блокировок отдельных коэффициентов может быть блокировка всей
+        линии (IsSuspended)
+
+        Такое обычно происходит в момент когда в игре происходит важное игровое
+        событие (VAR, пенальти...) либо букмекер пересчитывает линию.
+
+
+        Если значение коэффициента = 0, значит в этот момент коэффициент был
+        удален из линии
+      parameters:
+        - name: eventId
+          in: path
+          description: Id события (матча) на сайте Pari.ru
+          required: true
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type: integer
+            format: int32
+        - name: oddsType
+          in: query
+          description: "Тип коэффициентов: live | prematch"
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfApiPariOddsUpdate[]"
+  /Pari/events/{matchId}:
+    get:
+      tags:
+        - Pari
+      summary: Игровые события и статистика матча
+      description: >-
+        Возвращает список игровых событий и накопленную статистику матча,
+        вычисленную из потока сырых событий Pari.ru.
+                    
+        Полный список всех поддерживаемых типов событий
+        [/Pari/events/types](#tag/pari/GET/Pari/events/types)
+
+
+        Обновление данных: раз в 10 секунд
+      parameters:
+        - name: matchId
+          in: path
+          description: Id матча на сайте pari.ru
+          required: true
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type: integer
+            format: int32
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfApiPariEvents"
+  /Pari/teams:
+    get:
+      tags:
+        - Pari
+      summary: Команды
+      description: Получить список команд.
+      parameters:
+        - name: id
+          in: query
+          description: Id конкретной команды
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+        - name: countryId
+          in: query
+          description: Id страны
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfApiPariTeam[]"
+  /Pari/odds/market-types:
+    get:
+      tags:
+        - Pari
+      summary: Справочник маркетов и исходов
+      description: >-
+        Полный список маркетов с исходами. Используется для расшифровки
+        outcomeId, возвращаемого в истории коэффициентов.
+
+
+        Примечание: для каждого периода (1ый тайм, 2-ой тайм) outcome id разные.
+        Т.е outcomeId для 1X2:П1 для первого тайма отличается от того же самого
+        1X2:П1 для второго тайма 
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfApiPariMarket[]"
+  /Pari/events/types:
+    get:
+      tags:
+        - Pari
+      summary: Типы событий
+      description: Справочник всех типов игровых событий из
+        [/Pari/events/{matchId}](#tag/pari/GET/Pari/events/{matchId})
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfDictionaryOfintAndstring"
+  /Players/find:
+    get:
+      tags:
+        - Players
+      summary: Поиск игрока
+      description: >-
+        Выполняет поиск футболистов по имени или его части. Поиск не
+        чувствителен к регистру и находит всех игроков, 
+
+        в именах которых содержится указанная подстрока.
+
+
+        **Особенности:**
+
+        - Поиск выполняется по частичному совпадению
+
+        - Регистр символов не учитывается  
+
+        - Максимальное количество результатов: 100
+
+        - В ответе включается информация о текущей команде игрока
+
+
+        **Пример использования:**
+
+        - `name=ronaldo` - найдет игроков с именем, содержащим "Ronaldo"
+
+        - `name=John` - найдет всех игроков с именем, содержащим "John"
+      parameters:
+        - name: name
+          in: query
+          description: Имя или часть имени игрока для поиска (минимум 1 символ)
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfApiSaPlayerWithTeam[]"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfObject"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfObject"
+  /Players/{id}:
+    get:
+      tags:
+        - Players
+      summary: Данные по игроку
+      description: "Полные данные по игроку: текущая команда и история трансферов"
+      parameters:
+        - name: id
+          in: path
+          description: ""
+          required: true
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type: integer
+            format: int32
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfApiSaPlayerFull"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfObject"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfObject"
+  /Players/list:
+    get:
+      tags:
+        - Players
+      summary: Список игроков
+      description: Список всех игроков. Только информация о самом игроке, без команд и
+        трансферов
+      parameters:
+        - name: teamId
+          in: query
+          description: ""
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+        - name: offset
+          in: query
+          description: ""
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+            default: 0
+        - name: limit
+          in: query
+          description: ""
+          schema:
+            maximum: 1000
+            minimum: 1
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+            default: 1000
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfApiSaPlayerFull[]"
+  /Players/{id}/events:
+    get:
+      tags:
+        - Players
+      summary: События игрока
+      description: >-
+        Возвращает список событий указанного игрока в хронологическом порядке.
+
+
+        **По умолчанию включает события где игрок:**
+
+        - Является основным участником (голы, карточки, замены и т.д.)
+
+
+        **При включении `includeAssists = true` дополнительно включает:**
+
+        - События где игрок выступает в роли ассистента
+
+
+        События сортируются по дате матча (новые сначала), затем по времени в
+        матче.
+
+        Поддерживается пагинация для работы с большими объемами данных.
+      parameters:
+        - name: id
+          in: path
+          description: Уникальный идентификатор игрока
+          required: true
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type: integer
+            format: int32
+        - name: includeAssists
+          in: query
+          description: Включать ли события где игрок является ассистентом (по умолчанию
+            false)
+          schema:
+            type: boolean
+            default: false
+        - name: offset
+          in: query
+          description: Количество записей для пропуска (для пагинации)
+          schema:
+            maximum: 2147483647
+            minimum: 0
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+            default: 0
+        - name: limit
+          in: query
+          description: Максимальное количество записей в ответе (1-1000)
+          schema:
+            maximum: 1000
+            minimum: 1
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+            default: 1000
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfApiSaEvent[]"
+  /Seasons/standings:
+    get:
+      tags:
+        - Seasons
+      summary: Турнирная таблица сезона
+      description: >-
+        Официальная турнирная таблица для сезона.
+                    
+        Необходимо заполнить либо `uid` либо `leagueId` + `year`  
+
+        Uid сезонов можно узнать здесь: [/leagues](#tag/leagues/GET/Leagues)
+                    
+        ---
+                    
+        Более гибкая суммарная рейтинговая таблица:
+        [/games/season-table](#tag/games/GET/Games/season-table)
+      parameters:
+        - name: uid
+          in: query
+          description: ""
+          schema:
+            type: string
+            format: uuid
+        - name: leagueId
+          in: query
+          description: ""
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+        - name: year
+          in: query
+          description: ""
+          schema:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfApiStandings"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfApiStandings"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfApiStandings"
+  /Teams/list:
+    get:
+      tags:
+        - Teams
+      summary: Список команд
+      description: Список команд с возможностью фильтрации и пагинации
+      parameters:
+        - name: Name
+          in: query
+          description: Название команды
+          schema:
+            maxLength: 100
+            minLength: 2
+            type: string
+        - name: Country
+          in: query
+          schema:
+            maxLength: 50
+            minLength: 0
+            type: string
+        - name: Offset
+          in: query
+          schema:
+            maximum: 2147483647
+            minimum: 0
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+        - name: Limit
+          in: query
+          schema:
+            maximum: 1000
+            minimum: 1
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+      responses:
+        "200":
+          description: Список команд с информацией о пагинации
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfApiSaTeam[]"
+  /Teams/{id}:
+    get:
+      tags:
+        - Teams
+      summary: Получает детальную информацию о команде по ID
+      parameters:
+        - name: id
+          in: path
+          description: Идентификатор команды
+          required: true
+          schema:
+            maximum: 2147483647
+            minimum: 1
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type: integer
+            format: int32
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfApiSaTeamFull"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfObject"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponseOfObject"
+components:
+  schemas:
+    AccountInfo:
+      type: object
+      properties:
+        userName:
+          type: string
+        apiKey:
+          type: string
+    ApiGameGlicko:
+      required:
+        - fixture
+        - glicko
+      type: object
+      properties:
+        fixture:
+          $ref: "#/components/schemas/ApiSaGame"
+        glicko:
+          $ref: "#/components/schemas/ApiGlicko"
+    ApiGlicko:
+      type: object
+      properties:
+        homeRating:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$
+          type:
+            - number
+            - string
+          format: float
+        homeRd:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$
+          type:
+            - number
+            - string
+          format: float
+        awayRating:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$
+          type:
+            - number
+            - string
+          format: float
+        awayRd:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$
+          type:
+            - number
+            - string
+          format: float
+        homeXg:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$
+          type:
+            - "null"
+            - number
+            - string
+          format: float
+        awayXg:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$
+          type:
+            - "null"
+            - number
+            - string
+          format: float
+        homeWinProbability:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$
+          type:
+            - "null"
+            - number
+            - string
+          format: float
+        awayWinProbability:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$
+          type:
+            - "null"
+            - number
+            - string
+          format: float
+        updated:
+          type: string
+          format: date-time
+        homeVolatility:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$
+          type:
+            - number
+            - string
+          format: float
+        awayVolatility:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$
+          type:
+            - number
+            - string
+          format: float
+    ApiLiveOddsLastUpdate:
+      type: object
+      properties:
+        gameId:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        lastUpdate:
+          type: string
+          format: date-time
+    ApiMarketChangeHistory:
+      type: object
+      properties:
+        marketId:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int16
+        marketName:
+          type: string
+        outcomes:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApiOutcomeChanges"
+    ApiMarketProfit:
+      required:
+        - market
+        - outcomes
+      type: object
+      properties:
+        market:
+          type: string
+        outcomes:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApiTeamOutcomeProfit"
+    ApiMatchProfit:
+      required:
+        - home
+        - homeFirstHalf
+        - homeSecondHalf
+        - away
+        - awayFirstHalf
+        - awaySecondHalf
+      type: object
+      properties:
+        home:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApiMarketProfit"
+          description: Профит команды хозяев за основное время
+        homeFirstHalf:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApiMarketProfit"
+          description: Профит команды хозяев за первые таймы
+        homeSecondHalf:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApiMarketProfit"
+          description: Профит команды хозяев за вторые таймы
+        away:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApiMarketProfit"
+          description: Профит команды гостей за основное время
+        awayFirstHalf:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApiMarketProfit"
+          description: Профит команды гостей за первые таймы
+        awaySecondHalf:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApiMarketProfit"
+          description: Профит команды гостей за вторые таймы
+    ApiOddsValueChange:
+      type: object
+      properties:
+        elapsedSeconds:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int16
+        createdTime:
+          type: string
+          format: date-time
+        value:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$
+          type:
+            - number
+            - string
+          format: double
+    ApiOutcomeChanges:
+      type: object
+      properties:
+        outcomeId:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int16
+        outcomeName:
+          type: string
+        changes:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApiOddsValueChange"
+    ApiPariCountry:
+      required:
+        - name
+      type: object
+      properties:
+        id:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        code:
+          type:
+            - "null"
+            - string
+        name:
+          type: string
+        url:
+          type:
+            - "null"
+            - string
+    ApiPariEvents:
+      required:
+        - events
+        - stats
+      type: object
+      properties:
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/GameplayEvent"
+          description: "Список игровых событий матча (голы, карточки, замены, угловые и
+            т.д.),\r
+
+            очищенный от отменённых и технических событий, отсортированный по
+            времени регистрации"
+        stats:
+          oneOf:
+            - type: "null"
+            - description: "Накопленная игровая статистика, вычисленная на основе потока сырых
+                событий.\r
+
+                Включает голы, карточки, угловые, удары, атаки, владение мячом и
+                другие показатели\r
+
+                отдельно для хозяев (Home) и гостей (Away)"
+              $ref: "#/components/schemas/MatchStatistics"
+      description: Игровые события матча и накопленная статистика
+    ApiPariMarket:
+      required:
+        - name
+        - outcomes
+      type: object
+      properties:
+        id:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: Идентификатор типа маркета
+          format: int32
+        name:
+          type: string
+          description: Системное название маркета
+        description:
+          type:
+            - "null"
+            - string
+          description: Человекочитаемое описание маркета
+        hasParameter:
+          type: boolean
+          description: Маркет имеет числовой параметр (тотал, фора)
+        outcomes:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApiPariOutcomeItem"
+          description: Исходы данного маркета
+    ApiPariMatch:
+      required:
+        - matchInfo
+      type: object
+      properties:
+        matchInfo:
+          description: Данные матча
+          $ref: "#/components/schemas/ApiPariMatchInfo"
+        currentOdds:
+          type:
+            - "null"
+            - array
+          items:
+            $ref: "#/components/schemas/ApiPariOddsItem"
+          description: "Актуальные на данный момент коэффициенты. Если матч в лайве, то
+            здесь будут Live коэффициенты.\r
+
+            Если матч ещё не начался, то здесь будут доматчевые коэффициенты"
+        prematchOdds:
+          type:
+            - "null"
+            - array
+          items:
+            $ref: "#/components/schemas/ApiPariOddsItem"
+          description: Последние доматчевые коэффициенты
+    ApiPariMatchInfo:
+      required:
+        - tournament
+        - homeTeam
+        - awayTeam
+      type: object
+      properties:
+        eventId:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: Id события на сайте Pari.ru
+          format: int32
+        startDate:
+          type: string
+          description: Начало матча
+          format: date-time
+        status:
+          $ref: "#/components/schemas/PariMatchStatus"
+        tournament:
+          $ref: "#/components/schemas/ApiPariTournament"
+        homeTeam:
+          $ref: "#/components/schemas/ApiPariTeam"
+        awayTeam:
+          $ref: "#/components/schemas/ApiPariTeam"
+        homeScore:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          description: Общий счет хозяев
+          format: uint8
+        awayScore:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          description: Общий счет гостей
+          format: uint8
+        homeScoreHT:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          description: Счет первого тайма хозяев
+          format: uint8
+        awayScoreHT:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          description: Счет первого тайма гостей
+          format: uint8
+        liveSeconds:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          description: Секунда матча (для лайва)
+          format: int32
+        liveAddedTime:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          description: Добавленное время (для лайва, в минутах)
+          format: int32
+        liveFirstHalfAddedTime:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          description: Добавленное время первого тайма (для лайва, в минутах)
+          format: int32
+        url:
+          type:
+            - "null"
+            - string
+        lastUpdate:
+          type:
+            - "null"
+            - string
+          description: Время последнего обновления данных о матче
+          format: date-time
+        isDeleted:
+          type:
+            - "null"
+            - boolean
+          description: Матч был удален букмекером из линии ещё до начала
+    ApiPariOddsItem:
+      type: object
+      properties:
+        id:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: Идентификатор исхода
+          format: int16
+        name:
+          type:
+            - "null"
+            - string
+          description: Название исхода (маркет + выбор)
+        value:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?$
+          type:
+            - number
+            - string
+          description: Коэффициент
+          format: double
+        isBlocked:
+          type: boolean
+          description: Коэффициент временно заблокирован (недоступен для ставки)
+        isDeleted:
+          type: boolean
+          description: Коэффициент удален из линии
+    ApiPariOddsUpdate:
+      required:
+        - odds
+      type: object
+      properties:
+        seconds:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          description: Секунда матча на момент обновления котировок (для лайва)
+          format: int16
+        addedTime:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          description: Добавленное время в минутах на момент обновления (для лайва)
+          format: uint8
+        isLive:
+          type: boolean
+          description: Лайв коэффициенты или доматчевые
+        isSuspended:
+          type: boolean
+          description: Признак приостановки котировок
+        createdAt:
+          type: string
+          description: Время фиксации обновления котировок
+          format: date-time
+        odds:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApiPariOddsItem"
+          description: Котировки исходов на момент обновления
+    ApiPariOutcomeItem:
+      required:
+        - name
+      type: object
+      properties:
+        id:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: Идентификатор исхода (соответствует Id в истории коэффициентов)
+          format: int16
+        name:
+          type: string
+          description: Название исхода
+        period:
+          description: "Период: FirstHalf — первый тайм, SecondHalf — второй тайм,
+            FullTime — основное время, ExtraTime — дополнительное время,
+            PenaltyShootout — серия пенальти"
+          $ref: "#/components/schemas/PariPeriod"
+        parameter:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?$
+          type:
+            - "null"
+            - number
+            - string
+          description: Значение параметра исхода (тотал или фора), null для маркетов без
+            параметра
+          format: double
+    ApiPariTeam:
+      required:
+        - name
+      type: object
+      properties:
+        id:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        name:
+          type: string
+    ApiPariTournament:
+      required:
+        - name
+      type: object
+      properties:
+        id:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        name:
+          type: string
+        nameRus:
+          type:
+            - "null"
+            - string
+        keywords:
+          type:
+            - "null"
+            - string
+        url:
+          type:
+            - "null"
+            - string
+        country:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/ApiPariCountry"
+        isCurrent:
+          type: boolean
+    ApiPlayerUnavailability:
+      required:
+        - typeName
+      type: object
+      properties:
+        start:
+          type:
+            - "null"
+            - string
+          format: date
+        end:
+          type:
+            - "null"
+            - string
+          format: date
+        typeId:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        typeName:
+          type: string
+    ApiResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        data: {}
+        requestQuery:
+          type:
+            - "null"
+            - string
+        message:
+          type:
+            - "null"
+            - string
+        offset:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        TotalCount:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        traceId:
+          type:
+            - "null"
+            - string
+    ApiResponseOfAccountInfo:
+      type: object
+      properties:
+        status:
+          type: string
+        count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        data:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/AccountInfo"
+        requestQuery:
+          type:
+            - "null"
+            - string
+        message:
+          type:
+            - "null"
+            - string
+        offset:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        TotalCount:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        traceId:
+          type:
+            - "null"
+            - string
+    ApiResponseOfApiGameGlicko:
+      type: object
+      properties:
+        status:
+          type: string
+        count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        data:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/ApiGameGlicko"
+        requestQuery:
+          type:
+            - "null"
+            - string
+        message:
+          type:
+            - "null"
+            - string
+        offset:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        TotalCount:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        traceId:
+          type:
+            - "null"
+            - string
+    ApiResponseOfApiLiveOddsLastUpdate[]:
+      type: object
+      properties:
+        status:
+          type: string
+        count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        data:
+          type:
+            - "null"
+            - array
+          items:
+            $ref: "#/components/schemas/ApiLiveOddsLastUpdate"
+        requestQuery:
+          type:
+            - "null"
+            - string
+        message:
+          type:
+            - "null"
+            - string
+        offset:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        TotalCount:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        traceId:
+          type:
+            - "null"
+            - string
+    ApiResponseOfApiMarketChangeHistory[]:
+      type: object
+      properties:
+        status:
+          type: string
+        count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        data:
+          type:
+            - "null"
+            - array
+          items:
+            $ref: "#/components/schemas/ApiMarketChangeHistory"
+        requestQuery:
+          type:
+            - "null"
+            - string
+        message:
+          type:
+            - "null"
+            - string
+        offset:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        TotalCount:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        traceId:
+          type:
+            - "null"
+            - string
+    ApiResponseOfApiMatchProfit:
+      type: object
+      properties:
+        status:
+          type: string
+        count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        data:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/ApiMatchProfit"
+        requestQuery:
+          type:
+            - "null"
+            - string
+        message:
+          type:
+            - "null"
+            - string
+        offset:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        TotalCount:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        traceId:
+          type:
+            - "null"
+            - string
+    ApiResponseOfApiPariCountry[]:
+      type: object
+      properties:
+        status:
+          type: string
+        count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        data:
+          type:
+            - "null"
+            - array
+          items:
+            $ref: "#/components/schemas/ApiPariCountry"
+        requestQuery:
+          type:
+            - "null"
+            - string
+        message:
+          type:
+            - "null"
+            - string
+        offset:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        TotalCount:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        traceId:
+          type:
+            - "null"
+            - string
+    ApiResponseOfApiPariEvents:
+      type: object
+      properties:
+        status:
+          type: string
+        count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        data:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/ApiPariEvents"
+        requestQuery:
+          type:
+            - "null"
+            - string
+        message:
+          type:
+            - "null"
+            - string
+        offset:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        TotalCount:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        traceId:
+          type:
+            - "null"
+            - string
+    ApiResponseOfApiPariMarket[]:
+      type: object
+      properties:
+        status:
+          type: string
+        count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        data:
+          type:
+            - "null"
+            - array
+          items:
+            $ref: "#/components/schemas/ApiPariMarket"
+        requestQuery:
+          type:
+            - "null"
+            - string
+        message:
+          type:
+            - "null"
+            - string
+        offset:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        TotalCount:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        traceId:
+          type:
+            - "null"
+            - string
+    ApiResponseOfApiPariMatch:
+      type: object
+      properties:
+        status:
+          type: string
+        count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        data:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/ApiPariMatch"
+        requestQuery:
+          type:
+            - "null"
+            - string
+        message:
+          type:
+            - "null"
+            - string
+        offset:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        TotalCount:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        traceId:
+          type:
+            - "null"
+            - string
+    ApiResponseOfApiPariMatch[]:
+      type: object
+      properties:
+        status:
+          type: string
+        count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        data:
+          type:
+            - "null"
+            - array
+          items:
+            $ref: "#/components/schemas/ApiPariMatch"
+        requestQuery:
+          type:
+            - "null"
+            - string
+        message:
+          type:
+            - "null"
+            - string
+        offset:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        TotalCount:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        traceId:
+          type:
+            - "null"
+            - string
+    ApiResponseOfApiPariOddsUpdate[]:
+      type: object
+      properties:
+        status:
+          type: string
+        count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        data:
+          type:
+            - "null"
+            - array
+          items:
+            $ref: "#/components/schemas/ApiPariOddsUpdate"
+        requestQuery:
+          type:
+            - "null"
+            - string
+        message:
+          type:
+            - "null"
+            - string
+        offset:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        TotalCount:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        traceId:
+          type:
+            - "null"
+            - string
+    ApiResponseOfApiPariTeam[]:
+      type: object
+      properties:
+        status:
+          type: string
+        count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        data:
+          type:
+            - "null"
+            - array
+          items:
+            $ref: "#/components/schemas/ApiPariTeam"
+        requestQuery:
+          type:
+            - "null"
+            - string
+        message:
+          type:
+            - "null"
+            - string
+        offset:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        TotalCount:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        traceId:
+          type:
+            - "null"
+            - string
+    ApiResponseOfApiPariTournament:
+      type: object
+      properties:
+        status:
+          type: string
+        count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        data:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/ApiPariTournament"
+        requestQuery:
+          type:
+            - "null"
+            - string
+        message:
+          type:
+            - "null"
+            - string
+        offset:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        TotalCount:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        traceId:
+          type:
+            - "null"
+            - string
+    ApiResponseOfApiPariTournament[]:
+      type: object
+      properties:
+        status:
+          type: string
+        count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        data:
+          type:
+            - "null"
+            - array
+          items:
+            $ref: "#/components/schemas/ApiPariTournament"
+        requestQuery:
+          type:
+            - "null"
+            - string
+        message:
+          type:
+            - "null"
+            - string
+        offset:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        TotalCount:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        traceId:
+          type:
+            - "null"
+            - string
+    ApiResponseOfApiSaBookmaker[]:
+      type: object
+      properties:
+        status:
+          type: string
+        count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        data:
+          type:
+            - "null"
+            - array
+          items:
+            $ref: "#/components/schemas/ApiSaBookmaker"
+        requestQuery:
+          type:
+            - "null"
+            - string
+        message:
+          type:
+            - "null"
+            - string
+        offset:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        TotalCount:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        traceId:
+          type:
+            - "null"
+            - string
+    ApiResponseOfApiSaBookmakerOdds[]:
+      type: object
+      properties:
+        status:
+          type: string
+        count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        data:
+          type:
+            - "null"
+            - array
+          items:
+            $ref: "#/components/schemas/ApiSaBookmakerOdds"
+        requestQuery:
+          type:
+            - "null"
+            - string
+        message:
+          type:
+            - "null"
+            - string
+        offset:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        TotalCount:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        traceId:
+          type:
+            - "null"
+            - string
+    ApiResponseOfApiSaEvent[]:
+      type: object
+      properties:
+        status:
+          type: string
+        count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        data:
+          type:
+            - "null"
+            - array
+          items:
+            $ref: "#/components/schemas/ApiSaEvent"
+        requestQuery:
+          type:
+            - "null"
+            - string
+        message:
+          type:
+            - "null"
+            - string
+        offset:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        TotalCount:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        traceId:
+          type:
+            - "null"
+            - string
+    ApiResponseOfApiSaGame[]:
+      type: object
+      properties:
+        status:
+          type: string
+        count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        data:
+          type:
+            - "null"
+            - array
+          items:
+            $ref: "#/components/schemas/ApiSaGame"
+        requestQuery:
+          type:
+            - "null"
+            - string
+        message:
+          type:
+            - "null"
+            - string
+        offset:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        TotalCount:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        traceId:
+          type:
+            - "null"
+            - string
+    ApiResponseOfApiSaGameFull:
+      type: object
+      properties:
+        status:
+          type: string
+        count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        data:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/ApiSaGameFull"
+        requestQuery:
+          type:
+            - "null"
+            - string
+        message:
+          type:
+            - "null"
+            - string
+        offset:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        TotalCount:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        traceId:
+          type:
+            - "null"
+            - string
+    ApiResponseOfApiSaLeagueWithSeasons[]:
+      type: object
+      properties:
+        status:
+          type: string
+        count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        data:
+          type:
+            - "null"
+            - array
+          items:
+            $ref: "#/components/schemas/ApiSaLeagueWithSeasons"
+        requestQuery:
+          type:
+            - "null"
+            - string
+        message:
+          type:
+            - "null"
+            - string
+        offset:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        TotalCount:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        traceId:
+          type:
+            - "null"
+            - string
+    ApiResponseOfApiSaLiveOdds:
+      type: object
+      properties:
+        status:
+          type: string
+        count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        data:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/ApiSaLiveOdds"
+        requestQuery:
+          type:
+            - "null"
+            - string
+        message:
+          type:
+            - "null"
+            - string
+        offset:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        TotalCount:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        traceId:
+          type:
+            - "null"
+            - string
+    ApiResponseOfApiSaPlayerFull:
+      type: object
+      properties:
+        status:
+          type: string
+        count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        data:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/ApiSaPlayerFull"
+        requestQuery:
+          type:
+            - "null"
+            - string
+        message:
+          type:
+            - "null"
+            - string
+        offset:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        TotalCount:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        traceId:
+          type:
+            - "null"
+            - string
+    ApiResponseOfApiSaPlayerFull[]:
+      type: object
+      properties:
+        status:
+          type: string
+        count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        data:
+          type:
+            - "null"
+            - array
+          items:
+            $ref: "#/components/schemas/ApiSaPlayerFull"
+        requestQuery:
+          type:
+            - "null"
+            - string
+        message:
+          type:
+            - "null"
+            - string
+        offset:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        TotalCount:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        traceId:
+          type:
+            - "null"
+            - string
+    ApiResponseOfApiSaPlayerWithTeam[]:
+      type: object
+      properties:
+        status:
+          type: string
+        count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        data:
+          type:
+            - "null"
+            - array
+          items:
+            $ref: "#/components/schemas/ApiSaPlayerWithTeam"
+        requestQuery:
+          type:
+            - "null"
+            - string
+        message:
+          type:
+            - "null"
+            - string
+        offset:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        TotalCount:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        traceId:
+          type:
+            - "null"
+            - string
+    ApiResponseOfApiSaTeam[]:
+      type: object
+      properties:
+        status:
+          type: string
+        count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        data:
+          type:
+            - "null"
+            - array
+          items:
+            $ref: "#/components/schemas/ApiSaTeam"
+        requestQuery:
+          type:
+            - "null"
+            - string
+        message:
+          type:
+            - "null"
+            - string
+        offset:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        TotalCount:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        traceId:
+          type:
+            - "null"
+            - string
+    ApiResponseOfApiSaTeamFull:
+      type: object
+      properties:
+        status:
+          type: string
+        count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        data:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/ApiSaTeamFull"
+        requestQuery:
+          type:
+            - "null"
+            - string
+        message:
+          type:
+            - "null"
+            - string
+        offset:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        TotalCount:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        traceId:
+          type:
+            - "null"
+            - string
+    ApiResponseOfApiStandings:
+      type: object
+      properties:
+        status:
+          type: string
+        count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        data:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/ApiStandings"
+        requestQuery:
+          type:
+            - "null"
+            - string
+        message:
+          type:
+            - "null"
+            - string
+        offset:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        TotalCount:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        traceId:
+          type:
+            - "null"
+            - string
+    ApiResponseOfDictionaryOfintAndstring:
+      type: object
+      properties:
+        status:
+          type: string
+        count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        data:
+          type:
+            - "null"
+            - object
+          additionalProperties:
+            type: string
+        requestQuery:
+          type:
+            - "null"
+            - string
+        message:
+          type:
+            - "null"
+            - string
+        offset:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        TotalCount:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        traceId:
+          type:
+            - "null"
+            - string
+    ApiResponseOfObject:
+      type: object
+      properties:
+        status:
+          type: string
+        count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        data: {}
+        requestQuery:
+          type:
+            - "null"
+            - string
+        message:
+          type:
+            - "null"
+            - string
+        offset:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        TotalCount:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        traceId:
+          type:
+            - "null"
+            - string
+    ApiResponseOfRankTable:
+      type: object
+      properties:
+        status:
+          type: string
+        count:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        data:
+          type:
+            - "null"
+            - object
+          additionalProperties:
+            $ref: "#/components/schemas/Row"
+        requestQuery:
+          type:
+            - "null"
+            - string
+        message:
+          type:
+            - "null"
+            - string
+        offset:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        TotalCount:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        traceId:
+          type:
+            - "null"
+            - string
+    ApiSaBet:
+      type: object
+      properties:
+        marketId:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        marketName:
+          type: string
+        odds:
+          type: array
+          items:
+            $ref: "#/components/schemas/Price"
+    ApiSaBookmaker:
+      required:
+        - id
+        - bookmakerName
+      type: object
+      properties:
+        id:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        bookmakerName:
+          type: string
+    ApiSaBookmakerOdds:
+      type: object
+      properties:
+        bookmakerId:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        bookmakerName:
+          type: string
+        odds:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApiSaBet"
+    ApiSaCountry:
+      required:
+        - code
+        - name
+      type: object
+      properties:
+        code:
+          type: string
+          description: Уникальный код страны
+        name:
+          type: string
+    ApiSaEvent:
+      type: object
+      properties:
+        id:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        teamId:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        elapsed:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: Минута матча
+          format: uint8
+        extra:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          description: Добавленное время (в минутах)
+          format: uint8
+        type:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: "Тип события: (1 - гол, 2 - карточка, 3 - замена,  4 - VAR)\r
+
+            <remarks>Конкретное название события в Name</remarks>"
+          format: uint8
+        name:
+          type: string
+          description: "Название события\r
+
+            <remarks>(Normal Goal, Own Goal, Penalty, Missed Penalty, Yellow
+            Card, Red card, Substitution, Goal cancelled, Penalty
+            confirmed)</remarks>"
+        player:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/ApiSaPlayer"
+        assistPlayer:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/ApiSaPlayer"
+    ApiSaGame:
+      type: object
+      properties:
+        id:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        flashId:
+          type:
+            - "null"
+            - string
+          description: Id матча с сайта Flashscore
+        date:
+          type:
+            - "null"
+            - string
+          description: Время начала матча
+          format: date-time
+        dateUtc:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int64
+        status:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          description: Статус матча
+          format: uint8
+        periods:
+          type:
+            - "null"
+            - array
+          items:
+            type: string
+            format: date-time
+          description: Время начала таймов
+        statusName:
+          type:
+            - "null"
+            - string
+          description: Название статуса
+        elapsed:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          description: "Текущая минута матча (для LIVE). Без учета добавленного времени.
+            Всегда содержит только минуту главного таймера, без учета
+            добавленного времени.\r
+
+            (Например: Elapsed = 45, ExtraMinutes = 2 — означает 2 добавленную
+            минуту первого тайма)"
+          format: uint8
+        extraMinutes:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          description: Добавленное (в конце тайма) время. После завершения матча - хранит
+            добавленное время самого последнего тайма
+          format: uint8
+        homeResult:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          description: Счет хозяев в матче до начала пенальти (учитывает основное время и
+            дополнительное). Счет пенальти не учитывает
+          format: uint8
+        awayResult:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          description: Счет гостей в матче до начала пенальти (учитывает основное время и
+            дополнительное). Счет пенальти не учитывает
+          format: uint8
+        homeHTResult:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          description: Счет хозяев в первом тайме
+          format: uint8
+        awayHTResult:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          description: Счет гостей в первом тайме
+          format: uint8
+        homeFTResult:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          description: Счет хозяев в основном времени
+          format: uint8
+        awayFTResult:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          description: Счет гостей в основном времени
+          format: uint8
+        homeTeam:
+          $ref: "#/components/schemas/ApiSaTeam"
+        awayTeam:
+          $ref: "#/components/schemas/ApiSaTeam"
+        season:
+          $ref: "#/components/schemas/ApiSaSeason"
+        roundName:
+          type:
+            - "null"
+            - string
+        odds:
+          type:
+            - "null"
+            - array
+          items:
+            $ref: "#/components/schemas/ApiSaBet"
+    ApiSaGameFull:
+      required:
+        - game
+      type: object
+      properties:
+        game:
+          $ref: "#/components/schemas/ApiSaGame"
+        statistics:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/ApiSaStatistics"
+        lineups:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/ApiSaLineup"
+        lineupPlayers:
+          type:
+            - "null"
+            - array
+          items:
+            $ref: "#/components/schemas/ApiSaLineupPlayer"
+        playerStats:
+          type:
+            - "null"
+            - array
+          items:
+            $ref: "#/components/schemas/ApiSaPlayerStats"
+        events:
+          type:
+            - "null"
+            - array
+          items:
+            $ref: "#/components/schemas/ApiSaEvent"
+        venue:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/ApiSaVenue"
+        refereeName:
+          type:
+            - "null"
+            - string
+    ApiSaInjury:
+      type: object
+      properties:
+        gameId:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        player:
+          $ref: "#/components/schemas/ApiSaPlayer"
+        teamId:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        reason:
+          type:
+            - "null"
+            - string
+    ApiSaLeague:
+      required:
+        - name
+      type: object
+      properties:
+        id:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        name:
+          type: string
+        country:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/ApiSaCountry"
+        flashScoreId:
+          type:
+            - "null"
+            - string
+    ApiSaLeagueWithSeasons:
+      required:
+        - name
+      type: object
+      properties:
+        id:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        name:
+          type: string
+        country:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/ApiSaCountry"
+        flashScoreId:
+          type:
+            - "null"
+            - string
+        seasons:
+          type:
+            - "null"
+            - array
+          items:
+            $ref: "#/components/schemas/ApiSaSeasonFull"
+    ApiSaLineup:
+      type: object
+      properties:
+        homeFormation:
+          type:
+            - "null"
+            - string
+          description: Расстановка хозяев
+        awayFormation:
+          type:
+            - "null"
+            - string
+          description: Расстановка гостей
+        homeCoach:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/ApiSaPlayer"
+        awayCoach:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/ApiSaPlayer"
+    ApiSaLineupPlayer:
+      type: object
+      properties:
+        teamId:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        playerId:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        playerName:
+          type: string
+        number:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        position:
+          maxLength: 1
+          minLength: 1
+          type:
+            - "null"
+            - string
+          format: char
+        grid:
+          type: string
+        startXI:
+          type:
+            - "null"
+            - boolean
+    ApiSaLiveOdds:
+      type: object
+      properties:
+        elapsed:
+          pattern: ^-?(\d+\.)?\d{2}:\d{2}:\d{2}(\.\d{1,7})?$
+          type: string
+          description: Время матча в формате (ЧЧ:ММ:СС) 01:31:25 = 91-ая минута, 25 секунда
+        stopped:
+          type: boolean
+        finished:
+          type: boolean
+        lastUpdate:
+          type: string
+          format: date-time
+        gameStatus:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: Статус матча на момент обновления коэффициента (см таблицу 'Статусы
+            матча')
+          format: uint8
+        odds:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApiSaBet"
+    ApiSaPlayer:
+      type: object
+      properties:
+        id:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        name:
+          type: string
+    ApiSaPlayerFull:
+      type: object
+      properties:
+        firstName:
+          type:
+            - "null"
+            - string
+        lastName:
+          type:
+            - "null"
+            - string
+        nationality:
+          type:
+            - "null"
+            - string
+        height:
+          type:
+            - "null"
+            - string
+        birthDate:
+          type:
+            - "null"
+            - string
+          format: date
+        birthPlace:
+          type:
+            - "null"
+            - string
+        birthCountry:
+          type:
+            - "null"
+            - string
+        birthYearOnly:
+          type:
+            - "null"
+            - boolean
+          description: У данного игрока известен только год рождения. В этом случае месяц
+            и день всегда 1-ое января
+        photoUrl:
+          type:
+            - "null"
+            - string
+        unavailabilities:
+          type:
+            - "null"
+            - array
+          items:
+            $ref: "#/components/schemas/ApiPlayerUnavailability"
+        id:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        name:
+          type: string
+        currentTeam:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/ApiSaTeam"
+        transfers:
+          type:
+            - "null"
+            - array
+          items:
+            $ref: "#/components/schemas/ApiSaPlayerTransfer"
+    ApiSaPlayerStats:
+      type: object
+      properties:
+        playerId:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        minutes:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        capitan:
+          type:
+            - "null"
+            - boolean
+        substitute:
+          type:
+            - "null"
+            - boolean
+        offsides:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        shotsTotal:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        shotsOn:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        goalsTotal:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        goalsConceded:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        goalsAssists:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        goalsSaves:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        passesTotal:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int16
+        passesKey:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        passesAccuracy:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int16
+        tacklesTotal:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        tacklesBlocks:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        tacklesInterceptions:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        duelsTotal:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        duelsWon:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        dribblesAttempts:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        dribblesSuccess:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        dribblesPast:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        foulsDrawn:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        foulsCommitted:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        cardsYellow:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        cardsRed:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        penaltyWon:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        penaltyCommited:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        penaltyScored:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        penaltyMissed:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        penaltySaved:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        rating:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$
+          type:
+            - "null"
+            - number
+            - string
+          format: double
+    ApiSaPlayerTransfer:
+      type: object
+      properties:
+        from:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/ApiSaTeam"
+        to:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/ApiSaTeam"
+        date:
+          type:
+            - "null"
+            - string
+          format: date
+    ApiSaPlayerWithTeam:
+      type: object
+      properties:
+        id:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        name:
+          type: string
+        team:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/ApiSaTeam"
+    ApiSaSeason:
+      type: object
+      properties:
+        uid:
+          type: string
+          format: uuid
+        year:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        league:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/ApiSaLeague"
+    ApiSaSeasonFull:
+      type: object
+      properties:
+        uid:
+          type: string
+          format: uuid
+        year:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        league:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/ApiSaLeague"
+        dateStart:
+          type: string
+          format: date-time
+        dateEnd:
+          type: string
+          format: date-time
+        flashScoreId:
+          type:
+            - "null"
+            - string
+    ApiSaStatistics:
+      type: object
+      properties:
+        shotsOnGoalHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        shotsOnGoalAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        shotsOffGoalHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        shotsOffGoalAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        totalShotsHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        totalShotsAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        blockedShotsHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        blockedShotsAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        shotsInsideBoxHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        shotsInsideBoxAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        shotsOutsideBoxHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        shotsOutsideBoxAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        foulsHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        foulsAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        cornerKicksHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        cornerKicksAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        ballPossessionHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        ballPossessionAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        yellowCardsHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        yellowCardsAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        goalkeeperSavesHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        goalkeeperSavesAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        totalPassesHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int16
+        totalPassesAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int16
+        passesAccurateHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int16
+        passesAccurateAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int16
+        offsidesHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        offsidesAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        redCardsHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        redCardsAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        expectedGoalsHome:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$
+          type:
+            - "null"
+            - number
+            - string
+          format: double
+        expectedGoalsAway:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$
+          type:
+            - "null"
+            - number
+            - string
+          format: double
+        expectedAssistsHome:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$
+          type:
+            - "null"
+            - number
+            - string
+          format: float
+        expectedAssistsAway:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$
+          type:
+            - "null"
+            - number
+            - string
+          format: float
+        bigChancesHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        bigChancesAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        xgOnTargetHome:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$
+          type:
+            - "null"
+            - number
+            - string
+          format: float
+        xgOnTargetAway:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$
+          type:
+            - "null"
+            - number
+            - string
+          format: float
+        hitTheWoodworkHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        hitTheWoodworkAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        headedGoalsHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        headedGoalsAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        freeKicksHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        freeKicksAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        throwinsHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int16
+        throwinsAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int16
+        xgotFacedHome:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$
+          type:
+            - "null"
+            - number
+            - string
+          format: float
+        xgotFacedAway:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$
+          type:
+            - "null"
+            - number
+            - string
+          format: float
+        goalsPreventedHome:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$
+          type:
+            - "null"
+            - number
+            - string
+          format: float
+        goalsPreventedAway:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$
+          type:
+            - "null"
+            - number
+            - string
+          format: float
+        accurateThroughPassesHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        accurateThroughPassesAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        longPassesHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int16
+        longPassesAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int16
+        passesInFinalThirdHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int16
+        passesInFinalThirdAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int16
+        crossesHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        crossesAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        totalTacklesHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        totalTacklesAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        successTacklesHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        successTacklesAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        duelsWonHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        duelsWonAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        clearancesHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        clearancesAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        clearancesCompletedHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        clearancesCompletedAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        interceptionsHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        interceptionsAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        attacksHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int16
+        attacksAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int16
+        dangerousAttacksHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int16
+        dangerousAttacksAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int16
+        touchesInOppositionBoxHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        touchesInOppositionBoxAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        crossesCompletedHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        crossesCompletedAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        distanceCoveredHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        distanceCoveredAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        errorsLeadingToShotHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        errorsLeadingToShotAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        errorsLeadingToGoalHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        errorsLeadingToGoalAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: uint8
+        otherStatsHome:
+          type:
+            - "null"
+            - object
+          additionalProperties:
+            type: string
+        otherStatsAway:
+          type:
+            - "null"
+            - object
+          additionalProperties:
+            type: string
+        calculatedXgHome:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$
+          type:
+            - "null"
+            - number
+            - string
+          format: double
+        calculatedXgAway:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$
+          type:
+            - "null"
+            - number
+            - string
+          format: double
+    ApiSaTeam:
+      required:
+        - name
+      type: object
+      properties:
+        id:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        name:
+          type: string
+        flashId:
+          type:
+            - "null"
+            - string
+          description: Id команды с сайта Flashscore
+        logoUrl:
+          type:
+            - "null"
+            - string
+        country:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/ApiSaCountry"
+    ApiSaTeamFull:
+      required:
+        - name
+      type: object
+      properties:
+        id:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        name:
+          type: string
+        flashId:
+          type:
+            - "null"
+            - string
+          description: Id команды с сайта Flashscore
+        logoUrl:
+          type:
+            - "null"
+            - string
+        country:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/ApiSaCountry"
+        code:
+          type:
+            - "null"
+            - string
+          description: Сокращенная аббревиатура команды
+        founded:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          description: Год основания команды
+          format: int32
+        seasons:
+          type:
+            - "null"
+            - array
+          items:
+            $ref: "#/components/schemas/ApiSaSeason"
+          description: Сезоны команды
+        venue:
+          oneOf:
+            - type: "null"
+            - description: Стадион
+              $ref: "#/components/schemas/ApiSaVenue"
+        coach:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/ApiSaPlayer"
+        players:
+          type:
+            - "null"
+            - array
+          items:
+            $ref: "#/components/schemas/ApiSaPlayer"
+    ApiSaVenue:
+      type: object
+      properties:
+        name:
+          type:
+            - "null"
+            - string
+        address:
+          type:
+            - "null"
+            - string
+        city:
+          type:
+            - "null"
+            - string
+        capacity:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+    ApiStandingRow:
+      type: object
+      properties:
+        teamId:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        rank:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: uint8
+        groupName:
+          type:
+            - "null"
+            - string
+        description:
+          type:
+            - "null"
+            - string
+        points:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int16
+        form:
+          type:
+            - "null"
+            - string
+        played:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int16
+        wins:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int16
+        draws:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int16
+        loses:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int16
+        goalsFor:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int16
+        goalsAgainst:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int16
+    ApiStandings:
+      type: object
+      properties:
+        season:
+          $ref: "#/components/schemas/ApiSaSeason"
+        tables:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApiStandingTable"
+    ApiStandingTable:
+      required:
+        - rows
+      type: object
+      properties:
+        tableNum:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApiStandingRow"
+    ApiTeamOutcomeProfit:
+      required:
+        - name
+        - profit
+        - profitHistory
+        - gamesCount
+        - winCount
+      type: object
+      properties:
+        name:
+          type: string
+          description: Название исхода ставки
+        profit:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$
+          type:
+            - number
+            - string
+          description: Величина прибыли
+          format: float
+        profitHistory:
+          type: array
+          items:
+            pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$
+            type:
+              - number
+              - string
+            format: float
+          description: Динамика прибыли (изменение с каждым матчем)
+        gamesCount:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: Суммарное количество всех матчей
+          format: int32
+        winCount:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: Количество матчей, где ставка зашла
+          format: int32
+    GameplayEvent:
+      type: object
+      anyOf:
+        - $ref: "#/components/schemas/GameplayEventGoalEvent"
+        - $ref: "#/components/schemas/GameplayEventCardEvent"
+        - $ref: "#/components/schemas/GameplayEventSubstitutionEvent"
+        - $ref: "#/components/schemas/GameplayEventAddedTimeEvent"
+        - $ref: "#/components/schemas/GameplayEventCancellationEvent"
+        - $ref: "#/components/schemas/GameplayEventPauseEvent"
+        - $ref: "#/components/schemas/GameplayEventPenaltyEvent"
+        - $ref: "#/components/schemas/GameplayEventVarEvent"
+        - $ref: "#/components/schemas/GameplayEventThrowInEvent"
+        - $ref: "#/components/schemas/GameplayEventBase"
+    GameplayEventAddedTimeEvent:
+      required:
+        - EventClass
+      properties:
+        EventClass:
+          enum:
+            - AddedTime
+          type: string
+        minutesAdded:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        id:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int64
+        externalId:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int64
+        timestamp:
+          type: string
+          format: date-time
+        type:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/PariEventType"
+        name:
+          type:
+            - "null"
+            - string
+        team:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/TeamSide"
+        period:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        matchTime:
+          pattern: ^-?(\d+\.)?\d{2}:\d{2}:\d{2}(\.\d{1,7})?$
+          type:
+            - "null"
+            - string
+    GameplayEventBase:
+      properties:
+        id:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int64
+        externalId:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int64
+        timestamp:
+          type: string
+          format: date-time
+        type:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/PariEventType"
+        name:
+          type:
+            - "null"
+            - string
+        team:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/TeamSide"
+        period:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        matchTime:
+          pattern: ^-?(\d+\.)?\d{2}:\d{2}:\d{2}(\.\d{1,7})?$
+          type:
+            - "null"
+            - string
+    GameplayEventCancellationEvent:
+      required:
+        - EventClass
+      properties:
+        EventClass:
+          enum:
+            - Cancellation
+          type: string
+        cancelledEventId:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int64
+        id:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int64
+        externalId:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int64
+        timestamp:
+          type: string
+          format: date-time
+        type:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/PariEventType"
+        name:
+          type:
+            - "null"
+            - string
+        team:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/TeamSide"
+        period:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        matchTime:
+          pattern: ^-?(\d+\.)?\d{2}:\d{2}:\d{2}(\.\d{1,7})?$
+          type:
+            - "null"
+            - string
+    GameplayEventCardEvent:
+      required:
+        - EventClass
+      properties:
+        EventClass:
+          enum:
+            - Card
+          type: string
+        playerId:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int64
+        isRed:
+          type: boolean
+        isSecondYellow:
+          type: boolean
+        id:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int64
+        externalId:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int64
+        timestamp:
+          type: string
+          format: date-time
+        type:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/PariEventType"
+        name:
+          type:
+            - "null"
+            - string
+        team:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/TeamSide"
+        period:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        matchTime:
+          pattern: ^-?(\d+\.)?\d{2}:\d{2}:\d{2}(\.\d{1,7})?$
+          type:
+            - "null"
+            - string
+    GameplayEventGoalEvent:
+      required:
+        - EventClass
+      properties:
+        EventClass:
+          enum:
+            - Goal
+          type: string
+        scorerPlayerId:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int64
+        assistPlayerId:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int64
+        id:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int64
+        externalId:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int64
+        timestamp:
+          type: string
+          format: date-time
+        type:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/PariEventType"
+        name:
+          type:
+            - "null"
+            - string
+        team:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/TeamSide"
+        period:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        matchTime:
+          pattern: ^-?(\d+\.)?\d{2}:\d{2}:\d{2}(\.\d{1,7})?$
+          type:
+            - "null"
+            - string
+    GameplayEventPauseEvent:
+      required:
+        - EventClass
+      properties:
+        EventClass:
+          enum:
+            - Pause
+          type: string
+        pausedReasonCode:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        id:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int64
+        externalId:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int64
+        timestamp:
+          type: string
+          format: date-time
+        type:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/PariEventType"
+        name:
+          type:
+            - "null"
+            - string
+        team:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/TeamSide"
+        period:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        matchTime:
+          pattern: ^-?(\d+\.)?\d{2}:\d{2}:\d{2}(\.\d{1,7})?$
+          type:
+            - "null"
+            - string
+    GameplayEventPenaltyEvent:
+      required:
+        - EventClass
+      properties:
+        EventClass:
+          enum:
+            - Penalty
+          type: string
+        outcome:
+          $ref: "#/components/schemas/PenaltyOutcome"
+        playerId:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int64
+        id:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int64
+        externalId:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int64
+        timestamp:
+          type: string
+          format: date-time
+        type:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/PariEventType"
+        name:
+          type:
+            - "null"
+            - string
+        team:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/TeamSide"
+        period:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        matchTime:
+          pattern: ^-?(\d+\.)?\d{2}:\d{2}:\d{2}(\.\d{1,7})?$
+          type:
+            - "null"
+            - string
+    GameplayEventSubstitutionEvent:
+      required:
+        - EventClass
+      properties:
+        EventClass:
+          enum:
+            - Substitution
+          type: string
+        playerInId:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int64
+        playerOutId:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int64
+        id:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int64
+        externalId:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int64
+        timestamp:
+          type: string
+          format: date-time
+        type:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/PariEventType"
+        name:
+          type:
+            - "null"
+            - string
+        team:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/TeamSide"
+        period:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        matchTime:
+          pattern: ^-?(\d+\.)?\d{2}:\d{2}:\d{2}(\.\d{1,7})?$
+          type:
+            - "null"
+            - string
+    GameplayEventThrowInEvent:
+      required:
+        - EventClass
+      properties:
+        EventClass:
+          enum:
+            - ThrowIn
+          type: string
+        outTypeCode:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        id:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int64
+        externalId:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int64
+        timestamp:
+          type: string
+          format: date-time
+        type:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/PariEventType"
+        name:
+          type:
+            - "null"
+            - string
+        team:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/TeamSide"
+        period:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        matchTime:
+          pattern: ^-?(\d+\.)?\d{2}:\d{2}:\d{2}(\.\d{1,7})?$
+          type:
+            - "null"
+            - string
+    GameplayEventVarEvent:
+      required:
+        - EventClass
+      properties:
+        EventClass:
+          enum:
+            - Var
+          type: string
+        reason:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/VarReviewReason"
+        id:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int64
+        externalId:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int64
+        timestamp:
+          type: string
+          format: date-time
+        type:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/PariEventType"
+        name:
+          type:
+            - "null"
+            - string
+        team:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/TeamSide"
+        period:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          format: int32
+        matchTime:
+          pattern: ^-?(\d+\.)?\d{2}:\d{2}:\d{2}(\.\d{1,7})?$
+          type:
+            - "null"
+            - string
+    MatchStatistics:
+      type: object
+      properties:
+        home:
+          $ref: "#/components/schemas/TeamStatistics"
+        away:
+          $ref: "#/components/schemas/TeamStatistics"
+        playedTime:
+          pattern: ^-?(\d+\.)?\d{2}:\d{2}:\d{2}(\.\d{1,7})?$
+          type: string
+    PariEventType:
+      enum:
+        - TimerStopped
+        - Suspended
+        - GamePaused
+        - GameResumed
+        - EventCancelled
+        - VideoAssistantReferee
+        - VideoAssistantRefereeEnd
+        - VideoAssistantRefereeCancelled
+        - VideoAssistantRefereeReason
+        - Goal
+        - CornerKick
+        - PeriodEnd
+        - MatchEnd
+        - CompensationTime
+        - MatchStart
+        - Attack
+        - DangerousAttack
+        - YellowCard
+        - RedCard
+        - Penalty
+        - Substitution
+        - TimerRunning
+        - BallPossession
+        - ShotOnTarget
+        - ShotOffTarget
+        - FreeKick
+        - PeriodStart
+        - PenaltyScored
+        - PenaltyMissed
+        - KickOff
+        - ThrowIn
+        - GoalKick
+        - YellowCardNotAwarded
+        - ShotBlocked
+        - Offside
+        - Foul
+        - CardConfirmed
+        - RedCardSecondYellow
+        - null
+    PariMatchStatus:
+      enum:
+        - NotStarted
+        - Live
+        - WillStartSoon
+        - Finished
+    PariPeriod:
+      enum:
+        - FirstHalf
+        - SecondHalf
+        - FullTime
+        - ExtraTime
+        - PenaltyShootout
+    PenaltyOutcome:
+      enum:
+        - Awarded
+        - Scored
+        - Missed
+    Price:
+      type: object
+      properties:
+        name:
+          type: string
+        value:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$
+          type:
+            - number
+            - string
+          format: float
+        openingValue:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$
+          type:
+            - "null"
+            - number
+            - string
+          format: float
+    QueryGamesRequest:
+      required:
+        - condition
+      type: object
+      properties:
+        condition:
+          type: string
+          description: Условие фильтра
+          example: LeagueId = 41 AND Year = 2023
+        fields:
+          type:
+            - "null"
+            - array
+          items:
+            type: string
+          description: Поля для вывода (json массив)
+          example:
+            - Id
+            - HomeTeamName
+            - AwayTeamName
+            - Date
+        format:
+          type:
+            - "null"
+            - string
+          description: "Формат вывода: csv, json"
+          default: json
+        timezone:
+          maximum: 12
+          minimum: -12
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - "null"
+            - integer
+            - string
+          description: Временная зона
+          format: int32
+          default: 3
+          example: 3
+        order:
+          type:
+            - "null"
+            - string
+          description: "Поле по которому будет сортировка. Если необходима сортировка по
+            убыванию, то перед полем необходимо выставить '-'\r
+
+            По умолчанию по времени начала матча, по возрастанию.\r
+
+            Пример: ```-Date``` - сортировка по убыванию времени начала матча\r
+
+            <example>\"-Date\"</example>"
+          default: Date
+        offset:
+          maximum: 2147483647
+          minimum: 0
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: Смещение выборки от начала
+          format: int32
+        limit:
+          maximum: 1000
+          minimum: 1
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: Ограничить число максимально выводимых за раз записей
+          format: int32
+          example: 100
+    Row:
+      type: object
+      properties:
+        teamId:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: Team Id
+          format: int32
+        teamName:
+          type:
+            - "null"
+            - string
+          description: Team name
+        totalGames:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: Total games
+          format: int32
+        wins:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        draws:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        loss:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        goalsScored:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: Goals scored
+          format: int32
+        goalsMissed:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: Goals conceded
+          format: int32
+        points:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        over25TotalGames:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: Games with Total Over 2.5
+          format: int32
+        under25TotalGames:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: Games with Total Under 2.5
+          format: int32
+        over25TotalHomeGames:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: Home Games with Total Over 2.5
+          format: int32
+        under25TotalHomeGames:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: Home Games with Total Under 2.5
+          format: int32
+        over25TotalAwayGames:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: Away Games with Total Over 2.5
+          format: int32
+        under25TotalAwayGames:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: Away Games with Total Under 2.5
+          format: int32
+        homeGames:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: Home games
+          format: int32
+        awayGames:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: Away games
+          format: int32
+        homeWins:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: Home wins
+          format: int32
+        awayWins:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: Away wins
+          format: int32
+        homeDraws:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: Home draws
+          format: int32
+        awayDraws:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: Away draws
+          format: int32
+        homeLoss:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: Home loses
+          format: int32
+        awayLoss:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: Away loses
+          format: int32
+        homeScored:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: Home games goals
+          format: int32
+        awayScored:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: Away games goals
+          format: int32
+        homeMissed:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: Home games goals conceded
+          format: int32
+        awayMissed:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: Away games goals conceded
+          format: int32
+        homePoints:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: Home games points
+          format: int32
+        awayPoints:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: Away games points
+          format: int32
+        scoreDiff:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: Goals difference
+          format: int32
+        scoreDiffHome:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: Home games Goals difference
+          format: int32
+        scoreDiffAway:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          description: Away games Goals difference
+          format: int32
+        rank:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        homeRank:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        awayRank:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        form:
+          type: array
+          items:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+        formHome:
+          type: array
+          items:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+        formAway:
+          type: array
+          items:
+            pattern: ^-?(?:0|[1-9]\d*)$
+            type:
+              - integer
+              - string
+            format: int32
+    TeamSide:
+      enum:
+        - Unknown
+        - Home
+        - Away
+        - null
+    TeamStatistics:
+      type: object
+      properties:
+        goals:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        yellowCards:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        redCards:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        corners:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        shotsOnTarget:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        shotsOffTarget:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        attacks:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        dangerousAttacks:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        fouls:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        offsides:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        penalties:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        substitutions:
+          pattern: ^-?(?:0|[1-9]\d*)$
+          type:
+            - integer
+            - string
+          format: int32
+        possessionTimeSeconds:
+          pattern: ^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$
+          type:
+            - number
+            - string
+          format: double
+    VarReviewReason:
+      enum:
+        - PossibleGoal
+        - PossiblePenalty
+        - PossibleRedCard
+        - null
+  securitySchemes:
+    ApiAuthScheme:
+      type: apiKey
+      description: "API key в query string, например: ?apikey=<my_api_key>"
+      name: apikey
+      in: query
+tags:
+  - name: Account
+    description: "Аккаунт\r
+
+      \r
+
+      Данные об аккаунте и API токена
+
+      \           \ 
+
+      **Требуется авторизация по API ключу**
+
+      \           \ 
+
+      [Инструкция по авторизации](https://sstats.net/posts/api-auth)"
+    x-displayName: Аккаунт
+  - name: Excel
+    description: "Excel таблицы\r
+
+      \r
+
+      Данные запросы используются в таблицах Excel, получивших популярность в
+      народе, предназначенных для анализа предсказания футбольных матчей.
+
+      Оригинальные таблицы были модифицированы, заменив парсер сайта
+      Flashscore.com на API sstats.net
+
+      \           \ 
+
+      Это API так же может быть полезно для использования в других таблицах"
+    x-displayName: Excel таблицы
+  - name: Games
+    description: "Матчи\r
+
+      \r
+
+      Новые матчи добавляются несколько раз в день. Обновление доматчевой
+      информации по конкретному матчу происходит раз в 3 часа "
+    x-displayName: Матчи
+  - name: Leagues
+    description: "Лиги\r\n\r\nЛиги и турниры"
+    x-displayName: Лиги
+  - name: Ls
+    description: "Flashscore\r
+
+      \r
+
+      Данные с сайта Flashscore"
+    x-displayName: Flashscore
+  - name: Odds
+    description: Коэффициенты
+    x-displayName: Коэффициенты
+  - name: Pari
+    description: "Pari.ru\r
+
+      \r
+
+      *API для данных Pari.ru находится в тестовом режиме и может поменяться в
+      будущем*
+
+
+      Коэффициенты обновляются раз в 3 секунды, события - раз в 10 секунд
+
+      \           \ 
+
+      ## Рекомендуемый порядок работы
+
+      \           \ 
+
+      1. **`GET /pari/countries`** — получить список стран (id нужен для
+      фильтрации лиг)
+
+      2. **`GET /pari/leagues?countryId={id}`** — получить лиги нужной страны
+
+      3. **`GET /pari/matches?leagueId={id}`** — получить матчи лиги. Можно
+      добавить `&live=true` для лайв-матчей.
+
+      \   Коэффициенты в списке матчей по умолчанию **не возвращаются** — только
+      мета-данные.
+
+      \   Чтобы получить актуальные коэффициенты вместе с матчами, добавьте
+      `&includeOdds=true`.
+
+      \   Каждый матч содержит поле `lastUpdate` — время последнего обновления
+      данных.
+
+      \   Используйте его, чтобы не перезапрашивать матчи без изменений.
+
+      4. **`GET /pari/match/{eventId}`** — получить детали конкретного матча с
+      актуальными коэффициентами
+
+      \           \ 
+
+      Id лиг и матчей те же самые что на сайте Pari.ru
+
+      \           \ 
+
+      ## Структура коэффициентов
+
+      \           \ 
+
+      Коэффициенты возвращаются в плоском виде: каждый исход — это пара
+      `outcomeId` + `value`.
+
+      Чтобы сгруппировать исходы по рынку (маркету), периоду и параметру,
+      используйте справочник
+
+      **`GET /pari/odds/market-types`** — он расшифровывает все `outcomeId`."
+    x-displayName: Pari.ru
+  - name: Players
+    description: Игроки
+    x-displayName: Игроки
+  - name: Seasons
+    description: "Сезоны\r\n\r\nСезоны турниров"
+    x-displayName: Сезоны
+  - name: Teams
+    description: Команды
+    x-displayName: Команды

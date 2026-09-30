@@ -571,6 +571,37 @@ server.registerTool(
   },
 );
 
+/* 25. Структурированный прогноз → нативная карточка в интерфейсе (Фаза 9.4).
+ * В сеть не ходит: tool_use ловит фронтенд и рендерит ExpressCard/PredictionCard. */
+server.registerTool(
+  'emit_prediction',
+  {
+    description: `ВЫВОД ПРОГНОЗА В ИНТЕРФЕЙС. Вызывай этот инструмент каждый раз, когда даёшь
+пользователю одиночную ставку (type: prediction) или экспресс (type: express) — вместо
+перечисления ног текстом. После вызова дай краткое текстовое обоснование (не дублируя
+таблицу ног). legs — все ноги; для одиночной ставки ровно одна. key — строго один из:
+1, X, 2, tb15, tm15, tb25, tm25, tb35, tm35, btts_yes, btts_no.`,
+    inputSchema: z.object({
+      type: z.enum(['prediction', 'express']).describe('prediction — одиночная ставка, express — экспресс'),
+      legs: z.array(z.object({
+        gameId: z.number().int().describe('Id матча в SStats'),
+        match: z.string().describe('«Хозяева — Гости»'),
+        market: z.string().describe('Рынок по-русски: Исход 1 / Тотал больше 2.5 / Обе забьют — да…'),
+        key: z.string().describe('Машинный ключ: 1 / X / 2 / tb25 / tm25 / btts_yes…'),
+        pick: z.string().describe('Полная формулировка ставки'),
+        odds: z.number().describe('Коэффициент'),
+      })).min(1).max(12),
+      odds: z.number().describe('Итоговый коэффициент (произведение для экспресса)'),
+      fair: z.number().optional().describe('Справедливый коэффициент 1/P'),
+      ev: z.number().optional().describe('Expected value в процентах'),
+      probability: z.number().optional().describe('Вероятность захода по модели, %'),
+      risk: z.string().optional().describe('Главный риск — одна строка'),
+      confidence: z.string().optional().describe('низкий / средний / высокий'),
+    }),
+  },
+  async () => ({ content: [{ type: 'text', text: 'Прогноз передан в интерфейс карточкой.' }] }),
+);
+
 process.on('uncaughtException', (e) => console.error('[sstats] uncaught:', e?.stack || e));
 process.on('unhandledRejection', (e) => console.error('[sstats] unhandled:', e?.stack || e));
 
