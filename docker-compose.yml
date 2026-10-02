@@ -13,7 +13,7 @@ services:
     volumes:
       - ./workspace:/app/workspace          # конфиг агента (CLAUDE.md, skills, .mcp.json)
       - ./data:/app/data                    # история разборов SportChat
-      - claude_home:/home/sportchat/.claude # сессии Claude Code, плагины, транскрипты
+      - claude_home:/home/node/.claude      # сессии Claude Code, плагины, транскрипты
 
   # Автоматический HTTPS для домена: docker compose --profile proxy up -d
   caddy:

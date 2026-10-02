@@ -29,6 +29,7 @@ banner() { printf "\n${C_B}⚡ SportChat — установка на серве�
 
 TOKEN="" BASE_URL="https://openrouter.ai/api" PORT="3777" BIND_IP="127.0.0.1"
 DOMAIN="" BASIC_AUTH="" NONINTERACTIVE=0
+SUPABASE_URL="" SUPABASE_KEY="" SSTATS_KEY=""
 
 usage() { grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
 
@@ -40,6 +41,9 @@ while [[ $# -gt 0 ]]; do
     --bind-ip)    BIND_IP="$2"; shift 2 ;;
     --domain)     DOMAIN="$2"; shift 2 ;;
     --basic-auth) BASIC_AUTH="$2"; shift 2 ;;
+    --supabase-url) SUPABASE_URL="$2"; shift 2 ;;
+    --supabase-key) SUPABASE_KEY="$2"; shift 2 ;;
+    --sstats-key) SSTATS_KEY="$2"; shift 2 ;;
     --yes)        NONINTERACTIVE=1; shift ;;
     -h|--help)    usage ;;
     *) die "Неизвестный аргумент: $1 (см. --help)" ;;
@@ -104,10 +108,36 @@ ANTHROPIC_AUTH_TOKEN=$TOKEN
 PORT=$PORT
 BIND_IP=$BIND_IP
 DOMAIN=$DOMAIN
+SUPABASE_URL=$SUPABASE_URL
+SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_KEY
 EOF
   chmod 600 .env
   info ".env создан (права 600)"
 fi
+# Supabase в существующий .env, если флаги переданы (идемпотентно)
+if [[ -n "$SUPABASE_URL" ]]; then
+  (umask 077
+  awk -v u="$SUPABASE_URL" -v k="$SUPABASE_KEY" '
+    /^SUPABASE_URL=/ { print "SUPABASE_URL=" u; su=1; next }
+    /^SUPABASE_SERVICE_ROLE_KEY=/ { print "SUPABASE_SERVICE_ROLE_KEY=" k; sk=1; next }
+    { print }
+    END { if (!su) print "SUPABASE_URL=" u; if (!sk) print "SUPABASE_SERVICE_ROLE_KEY=" k }
+  ' .env > .env.tmp && mv .env.tmp .env)
+  chmod 600 .env
+  info "Supabase: URL/ключ записаны в .env"
+fi
+
+# ключ sstats.net → data/sstats-key.json (лента прогнозов, события, MCP)
+mkdir -p data
+if [[ -n "$SSTATS_KEY" ]]; then
+  printf '{"apikey":"%s"}' "$SSTATS_KEY" > data/sstats-key.json
+  chmod 600 data/sstats-key.json
+  info "Ключ sstats.net записан в data/sstats-key.json"
+elif [[ ! -f data/sstats-key.json ]]; then
+  warn "Нет data/sstats-key.json — лента прогнозов и события не заработают."
+  warn "Получи ключ на sstats.net и запиши: data/sstats-key.json → {\"apikey\":\"…\"}"
+fi
+
 # значения из .env по умолчанию, если флаги не заданы
 PORT="$(grep -E '^PORT=' .env | cut -d= -f2 || echo "$PORT")"
 BIND_IP="$(grep -E '^BIND_IP=' .env | cut -d= -f2 || echo "$BIND_IP")"

@@ -15,6 +15,7 @@ RUN npm ci --omit=dev --no-fund --no-audit
 COPY server ./server
 COPY public ./public
 COPY workspace ./workspace
+COPY sstats_mcp ./sstats_mcp
 
 # непривилегированный пользователь node (uid 1000, уже есть в образе);
 # HOME — для ~/.claude (сессии, плагины, транскрипты)
@@ -27,7 +28,7 @@ ENV HOME=/home/node \
     SPORTCHAT_PORT=3777
 
 EXPOSE 3777
-VOLUME ["/home/sportchat/.claude"]
+VOLUME ["/home/node/.claude"]
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=5 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.SPORTCHAT_PORT||3777)+'/api/meta').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
