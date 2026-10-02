@@ -54,15 +54,15 @@ export function createCoupons() {
       : l.presumed === 'lost' ? ' <b class="cp-presumed err">✗ рассчитано досрочно</b>' : '';
     const score = live
       ? `<span class="cp-score live">${esc(l.live.score)}<small>${l.live.minute ? `· ${l.live.minute}'` : ''}</small></span>`
-      : l.status === 'won' || l.status === 'lost' || l.status === 'void'
+      : (l.status === 'won' || l.status === 'lost' || l.status === 'void')
         ? `<span class="cp-score">${esc(l.score || 'финал')}</span>`
-        : '<span class="cp-score">—</span>';
+        : `<span class="cp-score pending">${l.start ? esc(l.start.split(' · ')[0]) : '—'}<small>${l.start ? esc(l.start.split(' · ')[1] || '') : ''}</small></span>`;
     const [label, cls] = LEG_STATUS[l.presumed === 'won' ? 'won' : l.presumed === 'lost' ? 'lost' : st] || LEG_STATUS.pending;
     return `
       <div class="cp-leg ${cls}">
         <svg><use href="#${st === 'won' ? 'i-check' : st === 'lost' ? 'i-x' : st === 'live' ? 'i-bolt' : 'i-clock'}"/></svg>
         <span class="cp-leg-match">${esc(l.match)}<small>${esc(l.market)}</small></span>
-        ${type === 'express' ? score : score}
+        ${score}
         <span class="cp-leg-odds">${l.odds}</span>
         <span class="cp-leg-st"><span class="st st-${cls}">${label}</span>${presumed}</span>
       </div>`;

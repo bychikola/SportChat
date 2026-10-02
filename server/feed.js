@@ -207,7 +207,7 @@ async function buildFeed(date, apiKey) {
     };
     matches.push(match);
     for (const v of variants.slice(0, 3)) {
-      if (v.value > 0.02) legsPool.push({ match: `${match.home} — ${match.away}`, gameId: match.id, market: v.name, key: v.market, p: v.p, odds: v.odds, value: v.value });
+      if (v.value > 0.02) legsPool.push({ match: `${match.home} — ${match.away}`, gameId: match.id, market: v.name, key: v.market, start: `${match.time} · ${match.day}`, p: v.p, odds: v.odds, value: v.value });
     }
   }
 

@@ -8,7 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadApiKey } from './sstats.js';
 import { outcomeFor } from './signals.js';
-import { fetchLiveMap, presumedFor, liveStage, publishIfChanged } from './live.js';
+import { fetchLiveMap, presumedFor, liveStage, fmtStart, publishIfChanged } from './live.js';
 import { authUser } from './auth.js';
 import { db, isConfigured } from './db.js';
 
@@ -38,6 +38,7 @@ async function enrichLive(list, apiKey) {
       if (g) {
         leg.status = 'live';
         leg.live = liveStage(g);
+        if (!leg.start) leg.start = fmtStart(g.date); // время начала (К-время)
         const presumed = presumedFor(leg.key, g);
         if (presumed) leg.presumed = presumed;
         changed = true;
@@ -89,9 +90,40 @@ async function autoCheck(list, liveMap) {
         if (String(leg.gameId) !== String(gid) || (leg.status !== 'pending' && leg.status !== 'live')) continue;
         const res = outcomeFor(leg.key, game);
         if (res) { leg.status = res; leg.score = `${game.homeResult}:${game.awayResult}`; leg.live = null; }
+        if (!leg.start) leg.start = fmtStart(game.date);
       }
     }
   }
+}
+
+/** Дозаполнение времени начала у ожидающих ног: батчи Upcoming на 3 дня (кэш 10 мин). */
+const startCache = new Map(); // date -> {at, map}
+async function backfillStarts(list, apiKey) {
+  const need = [];
+  for (const p of list.predictions) {
+    for (const leg of p.legs || []) if (!leg.start && leg.status === 'pending') need.push(leg);
+  }
+  if (!need.length) return;
+  const byId = new Map();
+  for (let off = 0; off <= 2; off++) {
+    const date = new Date(Date.now() + off * 864e5).toLocaleDateString('sv-SE', { timeZone: 'Europe/Moscow' });
+    let hit = startCache.get(date);
+    if (!hit || Date.now() - hit.at > 10 * 60_000) {
+      try {
+        const j = await (await fetch(`${BASE}/Games/list?Upcoming=true&Date=${date}&Limit=1000&Order=1&apikey=${apiKey}`, { signal: AbortSignal.timeout(15_000) })).json();
+        const map = new Map((j.data || []).map((g) => [String(g.id), fmtStart(g.date)]));
+        hit = { at: Date.now(), map };
+        startCache.set(date, hit);
+      } catch { continue; }
+    }
+    for (const [id, s] of hit.map) byId.set(id, s);
+  }
+  let changed = false;
+  for (const leg of need) {
+    const s = byId.get(String(leg.gameId));
+    if (s) { leg.start = s; changed = true; }
+  }
+  return changed;
 }
 
 /** Общий тик: live + финал + статусы купонов (вызывается по таймеру и на GET). */
@@ -103,6 +135,7 @@ async function tick() {
   try { liveMap = await fetchLiveMap(apiKey); } catch { /* старые данные останутся */ }
   if (liveMap) await enrichLive(list, apiKey);
   await autoCheck(list, liveMap);
+  await backfillStarts(list, apiKey);
   for (const p of list.predictions) {
     if (p.status === 'won' || p.status === 'lost') continue;
     const s = (p.legs || []).map((l) => l.status);
@@ -146,6 +179,7 @@ async function persist(list) {
       key: l.key || null,
       pick: l.pick || null,
       odds: l.odds ?? 1,
+      start: l.start || null,
       status: l.status || 'pending',
       score: l.score || null,
       live_score: l.live?.score || null,
@@ -192,6 +226,7 @@ router.post('/', async (req, res) => {
     key: String(l.key || '').trim().toLowerCase().slice(0, 12),
     pick: String(l.pick || '').slice(0, 200),
     odds: Number(String(l.odds ?? '').replace(',', '.')) || 1,
+    start: String(l.start || '').slice(0, 40) || null,
     status: 'pending',
   }));
   if (clean.some((l) => !l.gameId || !l.key)) {

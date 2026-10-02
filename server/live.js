@@ -55,3 +55,10 @@ export function liveStage(g) {
   const extra = Number(g.extraMinutes || 0);
   return { score: `${g.homeResult}:${g.awayResult}`, minute: m + extra, stage: g.statusName || 'Live' };
 }
+
+/** «13:30 · 1 окт» — время начала матча в МСК (для купонов). */
+export function fmtStart(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return `${d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow' })} · ${d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', timeZone: 'Europe/Moscow' }).replace('.', '')}`;
+}
