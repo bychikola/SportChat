@@ -8,6 +8,7 @@ import { createSettings } from './settings.js';
 import { createEvents } from './events.js';
 import { createFeed } from './feed.js';
 import { createStats } from './stats.js';
+import { createCoupons } from './coupons.js';
 import { createProfile } from './profile.js';
 
 /* ── состояние ── */
@@ -134,6 +135,7 @@ chat.bindSessionStarted((init) => {
 const eventsView = createEvents({ chat });
 const feed = createFeed();
 const stats = createStats();
+const coupons = createCoupons();
 const profile = createProfile();
 
 /* ══════════ Сайдбар: разделы (концепт-редизайн) + бейджи ══════════ */
@@ -141,7 +143,7 @@ document.querySelectorAll('.side-nav .nav-item').forEach((b) => {
   b.addEventListener('click', () => {
     const nav = b.dataset.nav;
     if (nav === 'events') { feed.open(); document.body.classList.remove('side-open'); }
-    if (nav === 'tracker') { eventsView.openTracker(); document.body.classList.remove('side-open'); }
+    if (nav === 'tracker') { coupons.open(); document.body.classList.remove('side-open'); }
     if (nav === 'stats') { stats.open(); document.body.classList.remove('side-open'); }
     if (nav === 'fav') {
       // избранное живёт на странице матчей — включаем фильтр «только избранное»
@@ -164,12 +166,18 @@ function refreshSideBadges() {
     navFav.textContent = fav;
   }
   const navExpress = $('#navExpress');
-  if (navExpress) {
-    api('/signals').then((j) => {
-      const n = j?.stats?.pending ?? 0;
-      navExpress.hidden = !n;
-      navExpress.textContent = n;
-    }).catch(() => { /* без бейджа */ });
+  const navCoupons = $('#navCoupons');
+  if (navCoupons) {
+    // купоны в работе = сигналы pending + принятые прогнозы live/pending
+    Promise.all([
+      api('/signals').catch(() => null),
+      api('/predictions').catch(() => null),
+    ]).then(([s, p]) => {
+      const n = (s?.stats?.pending ?? 0) + (p?.predictions ?? []).filter((x) => x.status === 'live' || x.status === 'pending').length;
+      navCoupons.hidden = !n;
+      navCoupons.textContent = n;
+      if (navExpress) navExpress.hidden = true;
+    });
   }
 }
 refreshSideBadges();
@@ -196,7 +204,7 @@ if (bottomNav) {
       const nav = b.dataset.nav;
       if (nav === 'chat') { feed.close(); eventsView.close(); stats.close(); }
       if (nav === 'events') feed.open();
-      if (nav === 'tracker') eventsView.openTracker();
+      if (nav === 'tracker') coupons.open();
       if (nav === 'profile') profile.open();
     });
   });

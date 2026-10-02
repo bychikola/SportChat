@@ -65,10 +65,11 @@ export function createFeed() {
       </div>`).join('');
   }
 
-  function decideCard(card, { acceptLabel, onAccept, acceptedNote, skipNote }) {
+  function decideCard(card, { acceptLabel, onAccept, acceptedNote, skipNote, allowAmount = false }) {
     const bar = document.createElement('div');
     bar.className = 'sig-actions';
     bar.innerHTML = `
+      ${allowAmount ? `<label class="cp-amount" title="Сумма ставки (необязательно)"><input type="number" inputmode="numeric" min="0" step="50" placeholder="${esc(lastAmount())}"> ₽</label>` : ''}
       <button class="btn-primary notch-sm sig-accept">${esc(acceptLabel)}</button>
       <button class="btn-secondary notch-sm sig-skip">Пропускаю</button>
       <div class="sig-status" hidden></div>`;
@@ -82,7 +83,8 @@ export function createFeed() {
     acc.addEventListener('click', async () => {
       acc.disabled = true;
       acc.textContent = 'Записываю…';
-      try { await onAccept(); } catch (e) { acc.disabled = false; acc.textContent = acceptLabel; toast(e.message, 'err'); return; }
+      const amount = allowAmount ? (parseFloat(bar.querySelector('.cp-amount input')?.value) || null) : null;
+      try { await onAccept(amount); } catch (e) { acc.disabled = false; acc.textContent = acceptLabel; toast(e.message, 'err'); return; }
       decide(true, acceptedNote);
     });
     skip.addEventListener('click', () => {
@@ -94,6 +96,8 @@ export function createFeed() {
     });
     card.appendChild(bar);
   }
+
+  const lastAmount = () => localStorage.getItem('sc_lastAmount') || '500';
 
   function logDecision(entry) {
     try {
@@ -138,12 +142,14 @@ export function createFeed() {
       <div class="express-risk"><svg><use href="#i-alert"/></svg> ${esc(ex.risk)}</div>`;
     decideCard(card, {
       acceptLabel: 'Принимаю экспресс',
-      onAccept: async () => {
+      allowAmount: true,
+      onAccept: async (amount) => {
+        if (amount) localStorage.setItem('sc_lastAmount', String(amount));
         await api('/predictions', { method: 'POST', body: {
-          legs: ex.legs, odds: ex.odds, fair: ex.fair, ev: ex.ev, probability: ex.probability, risk: ex.risk, source: 'feed',
+          legs: ex.legs, odds: ex.odds, fair: ex.fair, ev: ex.ev, probability: ex.probability, risk: ex.risk, source: 'feed', amount,
         }});
-        logDecision({ type: 'express', legs: ex.legs, odds: ex.odds, probability: ex.probability, accepted: true, source: 'feed' });
-        toast('Экспресс принят — статус ног будет отслеживаться', 'ok', 3600);
+        logDecision({ type: 'express', legs: ex.legs, odds: ex.odds, probability: ex.probability, accepted: true, amount, source: 'feed' });
+        toast(amount ? `Купон принят на ${amount.toLocaleString('ru-RU')} ₽ — трекается в «Моих купонах»` : 'Экспресс принят — статус ног будет отслеживаться', 'ok', 3600);
       },
       acceptedNote: 'принято — в «Моих прогнозах»',
       skipNote: { onSkip: (key) => logDecision({ type: 'express', legs: ex.legs, odds: ex.odds, probability: ex.probability, accepted: false, reason: key, source: 'feed' }) },

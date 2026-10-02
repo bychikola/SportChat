@@ -8,7 +8,7 @@ const CORE = [
   '/',
   '/index.html',
   '/css/app.css',
-  '/js/main.js', '/js/chat.js', '/js/events.js', '/js/profile.js', '/js/feed.js', '/js/stats.js', '/js/livepanel.js',
+  '/js/main.js', '/js/chat.js', '/js/events.js', '/js/profile.js', '/js/feed.js', '/js/stats.js', '/js/livepanel.js', '/js/coupons.js',
   '/js/rail.js', '/js/settings.js', '/js/api.js', '/js/md.js', '/js/util.js',
   '/manifest.webmanifest',
   '/icons/icon-192.png', '/icons/icon-512.png',

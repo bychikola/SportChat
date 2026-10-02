@@ -7,62 +7,122 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadApiKey } from './sstats.js';
 import { outcomeFor } from './signals.js';
+import { fetchLiveMap, presumedFor, liveStage } from './live.js';
 
 const router = express.Router();
+const BASE = 'https://api.sstats.net';
 const FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data', 'predictions.json');
 
 function readAll() {
-  try { return JSON.parse(fs.readFileSync(FILE, 'utf8')); } catch { return { version: 1, predictions: [] }; }
+  try { return JSON.parse(fs.readFileSync(FILE, 'utf8')); } catch { return { version: 1, seqNext: 1, predictions: [] }; }
 }
 function writeAll(list) {
   fs.writeFileSync(FILE, JSON.stringify(list, null, 2), 'utf8');
 }
 
-/** Проверка ног по завершённым матчам (как autoCheck в signals.js). */
-async function autoCheck(list) {
-  const apiKey = loadApiKey();
-  if (!apiKey) return;
-  const now = Date.now();
-  const pending = list.predictions.filter((p) => p.status === 'pending');
-  const legIds = new Set();
+/* ── Live-движок (PLAN-COUPONS К1): счёт/минута + досрочный расчёт ── */
+
+/** Обогащение pending-купов live-слоем + досрочные статусы. */
+async function enrichLive(list, apiKey) {
+  const pending = list.predictions.filter((p) => p.status === 'pending' || p.status === 'live');
+  if (!pending.length) return;
+  let liveMap;
+  try { liveMap = await fetchLiveMap(apiKey); } catch { return; }
+  let changed = false;
   for (const p of pending) {
     for (const leg of p.legs || []) {
-      if (leg.status === 'pending') legIds.add(String(leg.gameId));
-    }
-  }
-  let checked = 0;
-  for (const gid of legIds) {
-    if (checked >= 8) break;
-    checked++;
-    let game = null;
-    try {
-      const r = await fetch(`https://api.sstats.net/Games/${gid}?apikey=${apiKey}`, { signal: AbortSignal.timeout(12_000) });
-      const j = await r.json();
-      game = j?.data ?? j;
-    } catch { /* сетевой сбой — попробуем в следующий раз */ }
-    if (!game || game.statusName !== 'Ended') continue;
-    for (const p of list.predictions) {
-      for (const leg of p.legs || []) {
-        if (String(leg.gameId) !== String(gid) || leg.status !== 'pending') continue;
-        const res = outcomeFor(leg.key, game);
-        if (res) { leg.status = res; leg.score = `${game.homeResult}:${game.awayResult}`; }
+      const g = liveMap.get(String(leg.gameId));
+      if (g) {
+        leg.status = 'live';
+        leg.live = liveStage(g);
+        const presumed = presumedFor(leg.key, g);
+        if (presumed) leg.presumed = presumed;
+        changed = true;
+      } else if (leg.status === 'live') {
+        // матч ушёл из лайва (закончился или пауза) — финал посчитает outcomeFor ниже
+        leg.live = null;
+        changed = true;
       }
     }
-  }
-  // статусы экспрессов по ногам
-  for (const p of list.predictions) {
-    if (p.status !== 'pending') continue;
     const legStatuses = (p.legs || []).map((l) => l.status);
     if (legStatuses.includes('lost')) p.status = 'lost';
     else if (legStatuses.length && legStatuses.every((s) => s === 'won')) p.status = 'won';
     else if (legStatuses.length && legStatuses.every((s) => s !== 'pending')) p.status = 'void';
+    else if (legStatuses.includes('live')) p.status = 'live';
+  }
+  if (changed) writeAll(list);
+}
+
+/** Проверка завершённых матчей (финальный расчёт, как раньше). */
+async function autoCheck(list, liveMap) {
+  const apiKey = loadApiKey();
+  if (!apiKey) return;
+  const now = Date.now();
+  const pending = list.predictions.filter((p) => p.status === 'pending' || p.status === 'live');
+  const legIds = new Set();
+  for (const p of pending) {
+    for (const leg of p.legs || []) {
+      if (leg.status === 'pending' || leg.status === 'live') legIds.add(String(leg.gameId));
+    }
+  }
+  let checked = 0;
+  console.error(`[coupons] autoCheck: legs=${legIds.size} liveMap=${liveMap ? liveMap.size : 'null'}`);
+  for (const gid of legIds) {
+    if (checked >= 10) break;
+    const liveG = liveMap?.get(String(gid));
+    if (liveG) continue; // идёт — финал не нужен
+    checked++;
+    let game = null;
+    try {
+      const r = await fetch(`${BASE}/Games/${gid}?apikey=${apiKey}`, { signal: AbortSignal.timeout(12_000) });
+      const j = await r.json();
+      // Games/{id} отдаёт {status:'OK', data:{game:{…}}}; статус 8-10 = завершён
+      game = j?.data?.game ?? j?.data ?? j;
+    } catch { /* сетевой сбой — попробуем в следующий раз */ }
+    console.error(`[coupons] ${gid}: status=${game?.status} (${game?.statusName}) ${game?.homeResult}:${game?.awayResult}`);
+    if (!game || !(Number(game.status) >= 8 || /finished|ended/i.test(String(game.statusName)))) continue;
+    for (const p of list.predictions) {
+      for (const leg of p.legs || []) {
+        if (String(leg.gameId) !== String(gid) || (leg.status !== 'pending' && leg.status !== 'live')) continue;
+        const res = outcomeFor(leg.key, game);
+        if (res) { leg.status = res; leg.score = `${game.homeResult}:${game.awayResult}`; leg.live = null; }
+      }
+    }
+  }
+}
+
+/** Общий тик: live + финал + статусы купонов (вызывается по таймеру и на GET). */
+async function tick() {
+  const list = readAll();
+  const apiKey = loadApiKey();
+  if (!apiKey) return;
+  let liveMap = null;
+  try { liveMap = await fetchLiveMap(apiKey); } catch { /* старые данные останутся */ }
+  if (liveMap) await enrichLive(list, apiKey);
+  await autoCheck(list, liveMap);
+  for (const p of list.predictions) {
+    if (p.status !== 'pending') continue;
+    const s = (p.legs || []).map((l) => l.status);
+    if (s.includes('lost')) p.status = 'lost';
+    else if (s.length && s.every((x) => x === 'won')) p.status = 'won';
+    else if (s.length && s.every((x) => x !== 'pending')) p.status = 'void';
+    else if (s.includes('live')) p.status = 'live';
   }
   writeAll(list);
 }
 
+// тикер: каждые 20 сек, без наложения
+let ticking = false;
+setInterval(async () => {
+  if (ticking) return;
+  ticking = true;
+  try { await tick(); } catch (e) { console.error('[coupons] tick:', e?.message || e); }
+  ticking = false;
+}, 20_000);
+
 router.get('/', async (req, res) => {
+  try { await tick(); } catch { /* тикер не критичен для ответа */ }
   const list = readAll();
-  try { await autoCheck(list); } catch { /* некритично */ }
   res.json({ ok: true, predictions: [...list.predictions].reverse() });
 });
 
@@ -88,6 +148,8 @@ router.post('/', (req, res) => {
   list.seqNext = (list.seqNext || 1) + 1;
   list.predictions.push({
     id,
+    userId: String(b.userId || '').slice(0, 60) || null,   // кто принял (К3)
+    amount: Number(String(b.amount ?? '').replace(',', '.')) || null, // сумма ставки
     legs: clean,
     odds: Number(String(b.odds ?? '').replace(',', '.')) || +clean.reduce((a, l) => a * l.odds, 1).toFixed(2),
     fair: Number(String(b.fair ?? '').replace(',', '.')) || null,

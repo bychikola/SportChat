@@ -299,10 +299,11 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
     } catch { /* приватный режим — журнал не критичен */ }
   }
 
-  function decideBar({ acceptLabel, onAccept, skipLabel = 'Пропускаю', onSkip }) {
+  function decideBar({ acceptLabel, onAccept, skipLabel = 'Пропускаю', onSkip, allowAmount = false }) {
     const bar = document.createElement('div');
     bar.className = 'sig-actions';
     bar.innerHTML = `
+      ${allowAmount ? `<label class="cp-amount" title="Сумма ставки (необязательно)"><input type="number" inputmode="numeric" min="0" step="50" placeholder="${esc(localStorage.getItem('sc_lastAmount') || '500')}"> ₽</label>` : ''}
       <button class="btn-primary notch-sm sig-accept">${esc(acceptLabel)}</button>
       <button class="btn-secondary notch-sm sig-skip">${esc(skipLabel)}</button>
       <div class="sig-status"></div>`;
@@ -317,8 +318,9 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
     acc.addEventListener('click', async () => {
       acc.disabled = true;
       acc.textContent = 'Записываю…';
-      try { await onAccept(); } catch (e) { acc.disabled = false; acc.textContent = acceptLabel; toast(e.message, 'err'); return; }
-      decide(true, 'принято');
+      const amount = allowAmount ? (parseFloat(bar.querySelector('.cp-amount input')?.value) || null) : null;
+      try { await onAccept(amount); } catch (e) { acc.disabled = false; acc.textContent = acceptLabel; toast(e.message, 'err'); return; }
+      decide(true, amount ? `принято · ${Number(amount).toLocaleString('ru-RU')} ₽` : 'принято');
     });
     // Фаза 9.2: причина отклонения → в журнал решений
     skip.addEventListener('click', () => {
@@ -362,7 +364,9 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
 
     const { bar } = decideBar({
       acceptLabel: 'Принимаю ставку',
-      onAccept: async () => {
+      allowAmount: true,
+      onAccept: async (amount) => {
+        if (amount) localStorage.setItem('sc_lastAmount', String(amount));
         await api('/signals', { method: 'POST', body: {
           gameId: fields.gameid,
           match: fields.матч || '',
@@ -373,8 +377,9 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
           odds: fields.кэф || null,
           confidence: fields.уверенность || '',
           date: fields.дата || '',
+          amount,
         }});
-        logDecision({ type: 'signal', match: fields.матч || '', market: fields.рынок || '', pick: fields.pick, odds: fields.кэф || null, accepted: true });
+        logDecision({ type: 'signal', match: fields.матч || '', market: fields.рынок || '', pick: fields.pick, odds: fields.кэф || null, accepted: true, amount });
         toast('Сигнал принят — точность посчитается после матча', 'ok', 3600);
       },
       onSkip: (key) => logDecision({ type: 'signal', match: fields.матч || '', market: fields.рынок || '', pick: fields.pick, odds: fields.кэф || null, accepted: false, reason: key }),
@@ -443,8 +448,10 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
 
       const { bar } = decideBar({
         acceptLabel: 'Принимаю экспресс',
-        onAccept: async () => {
-          logDecision({ type: 'express', legs, odds, probability: prob || null, accepted: true });
+        allowAmount: true,
+        onAccept: async (amount) => {
+          if (amount) localStorage.setItem('sc_lastAmount', String(amount));
+          logDecision({ type: 'express', legs, odds, probability: prob || null, accepted: true, amount });
           toast('Экспресс принят — запись в журнале решений', 'ok', 3600);
         },
         onSkip: (key) => logDecision({ type: 'express', legs, odds, probability: prob || null, accepted: false, reason: key }),
@@ -475,6 +482,7 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
       if (!leg) return;
       const card = document.createElement('div');
       card.className = 'signal-card notch';
+      // (amount добавляется в decideBar при allowAmount)
       card.innerHTML = `
         <div class="sig-head">${icon('bolt')} СИГНАЛ — решение по ставке</div>
         <table class="sig-table">
@@ -487,12 +495,14 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
         </table>`;
       const { bar } = decideBar({
         acceptLabel: 'Принимаю ставку',
-        onAccept: async () => {
+        allowAmount: true,
+        onAccept: async (amount) => {
+          if (amount) localStorage.setItem('sc_lastAmount', String(amount));
           await api('/signals', { method: 'POST', body: {
             gameId: leg.gameId, match: leg.match, market: leg.market, key: leg.key,
-            pick: leg.pick || leg.market, odds: leg.odds, confidence: d.confidence || '',
+            pick: leg.pick || leg.market, odds: leg.odds, confidence: d.confidence || '', amount,
           }});
-          logDecision({ type: 'signal', match: leg.match, market: leg.market, pick: leg.pick, odds: leg.odds, accepted: true });
+          logDecision({ type: 'signal', match: leg.match, market: leg.market, pick: leg.pick, odds: leg.odds, accepted: true, amount });
           toast('Сигнал принят — точность посчитается после матча', 'ok', 3600);
         },
         onSkip: (key) => logDecision({ type: 'signal', match: leg.match, market: leg.market, pick: leg.pick, odds: leg.odds, accepted: false, reason: key }),
@@ -519,12 +529,14 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
         ${d.risk ? `<div class="express-risk"><svg><use href="#i-alert"/></svg> ${esc(d.risk)}</div>` : ''}`;
       const { bar } = decideBar({
         acceptLabel: 'Принимаю экспресс',
-        onAccept: async () => {
+        allowAmount: true,
+        onAccept: async (amount) => {
+          if (amount) localStorage.setItem('sc_lastAmount', String(amount));
           await api('/predictions', { method: 'POST', body: {
             legs: legs.map((l) => ({ gameId: l.gameId, match: l.match, market: l.market, key: l.key, pick: l.pick, odds: l.odds })),
-            odds: d.odds, fair: d.fair, ev: d.ev, probability: d.probability, risk: d.risk, source: 'chat',
+            odds: d.odds, fair: d.fair, ev: d.ev, probability: d.probability, risk: d.risk, source: 'chat', amount,
           }});
-          logDecision({ type: 'express', legs, odds: d.odds, probability: d.probability, accepted: true });
+          logDecision({ type: 'express', legs, odds: d.odds, probability: d.probability, accepted: true, amount });
           toast('Экспресс принят — статус ног будет отслеживаться', 'ok', 3600);
         },
         onSkip: (key) => logDecision({ type: 'express', legs, odds: d.odds, probability: d.probability, accepted: false, reason: key }),

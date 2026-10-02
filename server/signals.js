@@ -7,6 +7,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { loadApiKey } from './sstats.js';
+import { fetchLiveMap, presumedFor, liveStage } from './live.js';
 
 const router = express.Router();
 const FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data', 'signals.json');
@@ -89,6 +90,18 @@ router.get('/', async (req, res) => {
   const list = readAll();
   try { await autoCheck(list); } catch { /* некритично */ }
   const s = list.signals;
+  // live-слой (К1): счёт/минута для pending-сигналов по идущим матчам
+  try {
+    const apiKey = loadApiKey();
+    if (apiKey) {
+      const liveMap = await fetchLiveMap(apiKey);
+      for (const x of s) {
+        if (x.status !== 'pending') { x.live = null; continue; }
+        const g = liveMap.get(String(x.gameId));
+        x.live = g ? { ...liveStage(g), presumed: presumedFor(x.key, g) } : null;
+      }
+    }
+  } catch { /* без live-слоя ответ всё равно валиден */ }
   const settled = s.filter((x) => x.status === 'won' || x.status === 'lost');
   const won = settled.filter((x) => x.status === 'won').length;
   const byMarket = {};
@@ -140,6 +153,8 @@ router.post('/', (req, res) => {
     confidence: String(b.confidence || '').slice(0, 40),
     date: dateStr,
     matchTs: parseTs(dateStr),
+    userId: String(b.userId || '').slice(0, 60) || null,
+    amount: Number(String(b.amount ?? '').replace(',', '.')) || null,
     status: 'pending',
     createdAt: new Date().toISOString(),
     result: null,

@@ -538,6 +538,87 @@ body.stats-open .composer-wrap { display: none; }
 .myp-leg-market { flex: none; color: var(--flut); font-size: 11px; }
 .myp-leg-score { font-family: var(--f-mono); font-size: 11px; flex: none; width: 48px; text-align: right; }
 .myp-foot { display: flex; gap: 14px; margin-top: 8px; font-family: var(--f-mono); font-size: 10.5px; color: var(--faint); }
+
+/* ═══════════ МОИ КУПОНЫ (PLAN-COUPONS К2) ═══════════ */
+.coupons-view { display: none; flex-direction: column; flex: 1; min-height: 0; }
+body.coupons-open .coupons-view { display: flex; }
+body.coupons-open .stage-scroll { display: none; }
+body.coupons-open .composer-wrap { display: none; }
+.cp-filters { display: flex; gap: 6px; border-bottom: 1px solid var(--line); }
+.cp-live-count { color: var(--go); }
+.coupon-card {
+  margin-bottom: 12px; overflow: hidden;
+  background: var(--pitch-1);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+.cp-head {
+  display: flex; align-items: center; gap: 9px;
+  padding: 10px 14px; border-bottom: 1px solid var(--line);
+  font-family: var(--f-mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+}
+.cp-head svg { width: 15px; height: 15px; color: var(--flut); }
+.cp-head b { color: var(--chalk); font-weight: 600; }
+.cp-head .st { margin-left: auto; }
+/* цвет шапки купона = статус (как в БК) */
+.coupon-card.st-ok { box-shadow: inset 0 0 0 1px rgba(34, 197, 94, .5); }
+.coupon-card.st-ok .cp-head { background: var(--go-dim); color: var(--go); }
+.coupon-card.st-ok .cp-head b { color: var(--go); }
+.coupon-card.st-err { box-shadow: inset 0 0 0 1px rgba(239, 68, 68, .45); }
+.coupon-card.st-err .cp-head { background: var(--danger-dim); color: var(--danger); }
+.coupon-card.st-err .cp-head b { color: var(--danger); }
+.coupon-card.st-void { opacity: .7; }
+.coupon-card.st-void .cp-head { background: var(--pitch-3); color: var(--faint); }
+.coupon-card.st-live, .coupon-card.st-run { box-shadow: inset 0 0 0 1px rgba(127, 181, 255, .4); }
+.coupon-card.st-live .cp-head { background: rgba(127, 181, 255, .1); color: var(--sky); }
+.coupon-card.st-live .cp-head b { color: var(--sky); }
+.cp-live-pulse { animation: live-pulse 1.6s ease infinite; }
+@keyframes live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+@media (prefers-reduced-motion: reduce) { .cp-live-pulse { animation: none; } }
+.cp-body { padding: 4px 0; }
+.cp-leg {
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 14px; border-bottom: 1px solid var(--line);
+  font-size: 12.5px; color: var(--dim);
+}
+.cp-leg:last-child { border-bottom: none; }
+.cp-leg svg { width: 14px; height: 14px; flex: none; }
+.cp-leg.ok svg { color: var(--go); }
+.cp-leg.err svg { color: var(--danger); }
+.cp-leg.live svg { color: var(--sky); }
+.cp-leg.void svg { color: var(--faint); }
+.cp-leg-match { flex: 1; min-width: 0; line-height: 1.3; }
+.cp-leg-match small { display: block; font-size: 10.5px; color: var(--flut); }
+.cp-score { font-family: var(--f-mono); font-size: 12px; color: var(--chalk); white-space: nowrap; }
+.cp-score.live { color: var(--sky); font-weight: 700; }
+.cp-score small { color: var(--sky); margin-left: 3px; }
+.cp-leg-odds { font-family: var(--f-mono); font-weight: 700; color: var(--chalk); width: 42px; text-align: right; }
+.cp-leg-st { width: 108px; flex: none; text-align: right; }
+.cp-presumed { display: block; font-size: 9px; font-weight: 400; }
+.cp-presumed.ok { color: var(--go); }
+.cp-presumed.err { color: var(--danger); }
+.cp-foot {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 9px 14px; border-top: 1px solid var(--line);
+  font-family: var(--f-mono); font-size: 11px; color: var(--faint);
+  background: rgba(4, 7, 5, .35);
+}
+.cp-foot b { color: var(--chalk); }
+.cp-payout.ok b { color: var(--go); }
+.cp-payout.err { color: var(--danger); }
+.cp-date { margin-left: auto; }
+/* поле суммы (К3) */
+.cp-amount {
+  display: flex; align-items: center; gap: 4px;
+  padding: 6px 10px; border-radius: 8px;
+  background: var(--pitch-2); border: 1px solid var(--line-strong);
+  font-family: var(--f-mono); font-size: 11px; color: var(--faint);
+}
+.cp-amount input {
+  width: 64px; border: none; background: none; outline: none;
+  color: var(--chalk); font-family: var(--f-mono); font-size: 12px;
+}
+.cp-amount input::placeholder { color: var(--faint); }
+.cp-amount:focus-within { border-color: rgba(255, 180, 84, .5); }
 .btn-new {
   display: flex; align-items: center; justify-content: center; gap: 9px;
   flex: 1 1 auto; min-width: 0; padding: 11px 12px;

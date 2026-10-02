@@ -45,6 +45,7 @@
   <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M21 20H3.5"/></symbol>
   <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
   <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/><path d="m8.5 14.5 2 2 4-4"/></symbol>
+  <symbol id="i-ticket" viewBox="0 0 24 24"><path d="M4 8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2.2a1.8 1.8 0 0 0 0 3.6V16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2.2a1.8 1.8 0 0 0 0-3.6V8z"/><path d="M13.5 6v2M13.5 11v2M13.5 16v2" stroke-dasharray="2 2.2"/></symbol>
 </svg>
 
 <div id="app">
@@ -138,9 +139,9 @@
         <b class="nv-badge" id="navMatches" hidden></b>
       </button>
       <button class="nav-item" data-nav="tracker">
-        <svg><use href="#i-bolt"/></svg>
-        <span class="nv-t">Экспрессы<small>Готовые комбинации</small></span>
-        <b class="nv-badge" id="navExpress" hidden></b>
+        <svg><use href="#i-ticket"/></svg>
+        <span class="nv-t">Мои купоны<small>Ставки · Live-трекинг</small></span>
+        <b class="nv-badge" id="navCoupons" hidden></b>
       </button>
       <button class="nav-item" data-nav="stats">
         <svg><use href="#i-chart"/></svg>
@@ -336,6 +337,23 @@
       </div>
       <div class="feed-scroll" id="statsBody"></div>
     </section>
+
+    <!-- ═══════════ МОИ КУПОНЫ (PLAN-COUPONS К2) ═══════════ -->
+    <section id="couponsView" class="coupons-view" hidden>
+      <div class="feed-head">
+        <div class="feed-title-row">
+          <span class="pane-title">Мои купоны</span>
+          <span class="feed-src" id="cpLiveInfo">live-трекинг · обновление 20с</span>
+          <button id="couponsRefresh" class="mini-icon" title="Обновить"><svg><use href="#i-clock"/></svg></button>
+        </div>
+        <div class="cp-filters">
+          <button class="feed-filter active" data-f="all">Все</button>
+          <button class="feed-filter" data-f="active">В игре <b id="cpLiveCount" class="cp-live-count"></b></button>
+          <button class="feed-filter" data-f="settled">Рассчитанные</button>
+        </div>
+      </div>
+      <div class="feed-scroll" id="couponsList"></div>
+    </section>
   </main>
 
   <!-- ═══════════ Правый рейл ═══════════ -->
@@ -429,7 +447,7 @@
   <nav class="bottom-nav" id="bottomNav" aria-label="Навигация приложения">
     <button data-nav="chat" class="active"><svg><use href="#i-bolt"/></svg><span>Чат</span></button>
     <button data-nav="events"><svg><use href="#i-cal"/></svg><span>События</span></button>
-    <button data-nav="tracker"><svg><use href="#i-clock"/></svg><span>Трекер</span></button>
+    <button data-nav="tracker"><svg><use href="#i-ticket"/></svg><span>Купоны</span></button>
     <button data-nav="profile"><svg><use href="#i-user"/></svg><span>Профиль</span></button>
   </nav>
 
