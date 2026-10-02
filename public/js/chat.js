@@ -689,6 +689,9 @@ export function createChat({ S, ws, rail, setStatus, updateTablo, onSlash, getCo
         S.liveOutTokens = Math.max(S.liveOutTokens || 0, msg.tokens || 0);
         updateTablo();
         break;
+      case 'bet_update': // К4: сервер пушит изменения купонов — уведомляем вкладку
+        window.dispatchEvent(new CustomEvent('bet-update', { detail: msg }));
+        break;
       case 'result':
         finishRunMeta(msg);
         for (const t of cur?.tools.values() || []) {

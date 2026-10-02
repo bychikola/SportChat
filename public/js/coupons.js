@@ -144,5 +144,8 @@ export function createCoupons() {
   });
   $('#couponsRefresh')?.addEventListener('click', () => load());
 
+  // К4: мгновенное обновление по WS-пушу (без ожидания поллинга)
+  window.addEventListener('bet-update', () => { if (isOpen()) load(true); });
+
   return { open, close, toggle, isOpen, load };
 }

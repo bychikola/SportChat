@@ -1,10 +1,26 @@
 /* Общий live-слой для купонов и сигналов (PLAN-COUPONS К1):
- * один батч-запрос Live-матчей sstats с кэшем 15 секунд. */
+ * один батч-запрос Live-матчей sstats с кэшем 15 секунд.
+ * К4: шина обновлений купонов — index.js рассылает по WS. */
 import dns from 'node:dns';
+import { EventEmitter } from 'node:events';
 dns.setDefaultResultOrder('ipv4first');
 
 const BASE = 'https://api.sstats.net';
 const cache = { at: 0, map: new Map() };
+
+export const couponBus = new EventEmitter();
+let lastHash = '';
+
+/** Пуш только при реальном изменении статусов/счётов (дифф по хэшу). */
+export function publishIfChanged(payload) {
+  const hash = JSON.stringify((payload.predictions || []).map((p) => [
+    p.id, p.status, (p.legs || []).map((l) => [l.status, l.score, l.live?.score || null, l.live?.minute || null, l.presumed || null]),
+  ]));
+  if (hash === lastHash) return false;
+  lastHash = hash;
+  couponBus.emit('update', payload);
+  return true;
+}
 
 export async function fetchLiveMap(apiKey) {
   if (Date.now() - cache.at < 15_000) return cache.map;

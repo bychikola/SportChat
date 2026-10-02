@@ -5,6 +5,7 @@ import path from 'node:path';
 import { WebSocketServer } from 'ws';
 import { ROOT, ensureWorkspace } from './store.js';
 import { ChatConnection } from './agent.js';
+import { couponBus } from './live.js';
 import apiRouter from './routes.js';
 
 // api.sstats.net отдаёт IPv6 (AAAA), но IPv6-маршрутизация у пользователей часто
@@ -48,6 +49,14 @@ app.get('*', (req, res, next) => {
 
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
+
+// К4: live-обновления купонов — пуш всем открытым WS при изменении статусов/счётов
+couponBus.on('update', (payload) => {
+  const msg = JSON.stringify({ t: 'bet_update', predictions: payload.predictions });
+  for (const client of wss.clients) {
+    if (client.readyState === 1) client.send(msg);
+  }
+});
 
 wss.on('connection', (ws) => {
   console.log(`[ws] соединение открыто (всего: ${wss.clients.size})`);
