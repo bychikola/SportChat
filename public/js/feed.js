@@ -42,6 +42,16 @@ export function createFeed() {
           if (g) lpShowLive(g.id, { home: g.home, away: g.away, league: g.league, stage: g.stage, score: g.score, minute: g.minute });
         });
       });
+      // карусель крутится колёсиком мыши на десктопе
+      if (!box.dataset.wheel) {
+        box.dataset.wheel = '1';
+        box.addEventListener('wheel', (e) => {
+          if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+            e.preventDefault();
+            box.scrollLeft += e.deltaY;
+          }
+        }, { passive: false });
+      }
     } catch { /* live-блок не критичен */ }
   }
 
