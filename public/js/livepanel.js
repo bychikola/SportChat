@@ -307,7 +307,7 @@ export function lpShowLive(id, pre) {
         match.innerHTML = `<span class="lp-q">${esc(d.match.home)} — ${esc(d.match.away)}</span><small>${esc(d.match.league)} · ${esc(d.match.stage)} · счёт ${esc(d.match.score)} · ${d.match.minute}' · начало ${esc(d.match.start || '—')}</small>`;
       }
       const valueRows = (d.value || []).map((v) =>
-        `<tr><td>${esc(v.name)}</td><td class="sig-odds">${v.odds}</td><td class="${v.value > 0 ? 'ok' : 'err'}">${v.value > 0 ? '+' : ''}${v.value}%</td></tr>`).join('');
+        `<tr><td>${esc(v.name)}</td><td class="sig-odds">${v.odds}</td><td class="${v.value > 0 ? 'ok' : 'err'}">${v.value > 0 ? '+' : ''}${v.value}%</td><td class="lp-src-bk">${esc(v.source || 'SStats')}</td></tr>`).join('');
       const scen = (d.scenarios || []).map((s) => `<div class="lp-scen">${esc(s)}</div>`).join('');
       $('#lpSummary').innerHTML = `
         ${liveChart(d.history)}
@@ -318,7 +318,7 @@ export function lpShowLive(id, pre) {
           <tr><th>Тотал больше 2.5</th><td class="sig-odds">${d.model.tb25}%</td></tr>
         </table>
         ${d.pressure ? `<div class="lp-note">Удары: ${esc(d.pressure.shots)}</div>` : ''}
-        ${valueRows ? `<table class="sig-table"><thead><tr><th>Live-value (Pari/линия)</th><th>Кэф</th><th>Value</th></tr></thead><tbody>${valueRows}</tbody></table>` : ''}
+        ${valueRows ? `<table class="sig-table"><thead><tr><th>Live-value</th><th>Кэф</th><th>Value</th><th>БК</th></tr></thead><tbody>${valueRows}</tbody></table>` : ''}
         ${scen}`;
       setConf(d.confidence, 'уверенность модели');
     } catch (e) {

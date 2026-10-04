@@ -114,6 +114,71 @@ function appendHist(id, point) {
   return arr;
 }
 
+/* ── К5+: live-линия Pari (второй источник) ── */
+let pariMtCache = { at: 0, arr: [] };
+let pariLiveCache = { at: 0, map: new Map() };
+
+async function pariMarketTypes(apiKey) {
+  if (Date.now() - pariMtCache.at < 60 * 60_000) return pariMtCache.arr;
+  try {
+    const j = await sget('/Pari/odds/market-types', {}, apiKey);
+    pariMtCache = { at: Date.now(), arr: Array.isArray(j.data) ? j.data : [] };
+  } catch { pariMtCache = { at: Date.now(), arr: pariMtCache.arr }; }
+  return pariMtCache.arr;
+}
+
+async function pariLiveMap(apiKey) {
+  if (Date.now() - pariLiveCache.at < 20_000) return pariLiveCache.map;
+  const j = await sget('/Pari/matches', { live: 'true', includeOdds: 'true', limit: 1000 }, apiKey);
+  const map = [];
+  for (const m of Array.isArray(j.data) ? j.data : []) {
+    const mi = m.matchInfo || {};
+    map.push({ m, pHome: teamNorm(mi.homeTeam?.name), pAway: teamNorm(mi.awayTeam?.name) });
+  }
+  pariLiveCache = { at: Date.now(), map };
+  return map;
+}
+
+const teamNorm = (s) => String(s || '').toLowerCase().replace(/[^a-zа-я0-9]/gi, '');
+/** Значимые токены названия: ≥4 символа, без квалификаторов (U23, II, W…) */
+const teamTokens = (name) => teamNorm(name).split(/[^a-zа-я0-9]+/).filter((t) => t.length >= 4 && !/^(u23|u21|u19|ii|iii|iv|fc|sk|fk|kk)$/.test(t));
+
+/** Pari live-кэфы для матча sstats: сопоставление по названиям команд. */
+async function pariLiveOdds(hName, aName, apiKey) {
+  try {
+    const [mt, liveMap] = await Promise.all([pariMarketTypes(apiKey), pariLiveMap(apiKey)]);
+    // исходы основного времени: outcomeId → исход+линия (id глобальные)
+    const occ = new Map();
+    for (const mkt of mt) {
+      for (const oc of mkt.outcomes || []) {
+        if (oc.period !== 'FullTime') continue;
+        occ.set(oc.id, { outcome: oc.name || '', param: oc.parameter ?? null });
+      }
+    }
+    // сопоставление команд по значимым токенам: «Ural II» ≈ «Ural 2 Yekaterinburg»
+    let pariMatch = null;
+    const hTok = teamTokens(hName), aTok = teamTokens(aName);
+    if (!hTok.length || !aTok.length) return null;
+    for (const { m, pHome, pAway } of liveMap) {
+      if (hTok.some((t) => pHome.includes(t)) && aTok.some((t) => pAway.includes(t))) { pariMatch = m; break; }
+    }
+    if (!pariMatch) return null;
+    const byId = new Map((pariMatch.currentOdds || []).map((o) => [o.id, o.value]));
+    const out = { source: 'Pari', h: null, x: null, a: null, over25: null, under25: null };
+    for (const [oid, value] of byId) {
+      const info = occ.get(oid);
+      if (!info) continue;
+      const o = info.outcome, param = info.param;
+      if (o === 'Home' && param == null && out.h == null) out.h = value;
+      if (o === 'Draw' && param == null && out.x == null) out.x = value;
+      if (o === 'Away' && param == null && out.a == null) out.a = value;
+      if (o === 'Over' && parseFloat(param) === 2.5 && out.over25 == null) out.over25 = value;
+      if (o === 'Under' && parseFloat(param) === 2.5 && out.under25 == null) out.under25 = value;
+    }
+    return (out.h || out.a || out.over25) ? out : null;
+  } catch { return null; }
+}
+
 async function buildLive(id, apiKey) {
   const game = await sget(`/Games/${id}`, {}, apiKey);
   const g = game?.data?.game ?? game?.data ?? game;
@@ -170,15 +235,27 @@ async function buildLive(id, apiKey) {
     }
   }
   const value = [];
-  const pushV = (market, name, prob, odd) => {
+  const pushV = (market, name, prob, odd, source = 'SStats') => {
     if (!odd || !Number.isFinite(prob)) return;
-    value.push({ market, name, p: prob, odds: odd, value: prob * odd - 1 });
+    value.push({ market, name, p: prob, odds: odd, value: prob * odd - 1, source });
   };
   pushV('1', 'Исход 1', probs.p1, odds.h);
   pushV('X', 'Ничья', probs.px, odds.x);
   pushV('2', 'Исход 2', probs.p2, odds.a);
   pushV('tb25', 'Тотал больше 2.5', probs.tb25, odds.over25);
   pushV('tm25', 'Тотал меньше 2.5', probs.tm25, odds.under25);
+  // К5+: live-линия Pari — второй взгляд букмекера
+  try {
+    const pari = await pariLiveOdds(g.homeTeam?.name, g.awayTeam?.name, apiKey);
+    console.error(`[live] pari=${pari ? JSON.stringify(pari) : 'null'}`);
+    if (pari) {
+      pushV('1', 'Исход 1', probs.p1, pari.h, 'Pari');
+      pushV('X', 'Ничья', probs.px, pari.x, 'Pari');
+      pushV('2', 'Исход 2', probs.p2, pari.a, 'Pari');
+      pushV('tb25', 'Тотал больше 2.5', probs.tb25, pari.over25, 'Pari');
+      pushV('tm25', 'Тотал меньше 2.5', probs.tm25, pari.under25, 'Pari');
+    }
+  } catch { /* без Pari */ }
   value.sort((a, b) => b.value - a.value);
 
   // история + сценарии
@@ -206,8 +283,8 @@ async function buildLive(id, apiKey) {
     },
     confidence: Math.round(clamp(40 + (hasForm ? 25 : 0) + (isLive ? 15 : 5) + (odds.h ? 10 : 0), 40, 92)),
     odds,
-    value: value.filter((v) => v.odds >= 1.15).slice(0, 4).map((v) => ({
-      market: v.market, name: v.name, p: Math.round(v.p * 100), odds: v.odds, value: Math.round(v.value * 100),
+    value: value.filter((v) => v.odds >= 1.15).slice(0, 8).map((v) => ({
+      market: v.market, name: v.name, p: Math.round(v.p * 100), odds: v.odds, value: Math.round(v.value * 100), source: v.source || 'SStats',
     })),
     scenarios: scen,
     history: history.slice(-40),

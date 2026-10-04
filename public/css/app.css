@@ -2102,3 +2102,7 @@ html, body { overflow-x: clip; }
   .check-row input { width: 18px; height: 18px; margin-top: 1px; }
 }
 }
+.lp-src-bk {
+  font-family: var(--f-mono); font-size: 9.5px; color: var(--faint);
+  text-transform: uppercase; letter-spacing: .08em; white-space: nowrap;
+}
