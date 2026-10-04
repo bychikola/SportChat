@@ -139,24 +139,60 @@ const coupons = createCoupons();
 const profile = createProfile();
 
 /* ══════════ Сайдбар: разделы (концепт-редизайн) + бейджи ══════════ */
-// вьюхи взаимоисключающие: открытие одной закрывает остальные
+// вьюхи взаимоисключающие; повторный клик по активному разделу → назад в чат
 const VIEW_CLASSES = ['feed-open', 'events-open', 'coupons-open', 'stats-open'];
-function showView(open) {
-  VIEW_CLASSES.forEach((c) => document.body.classList.remove(c));
-  open();
-  document.body.classList.remove('side-open');
+let lastViewKey = 'chat';
+
+function closeAllViews() {
+  feed.close(); eventsView.close(); stats.close(); coupons.close();
 }
+
+function syncNav() {
+  const cls = document.body.classList;
+  const anyView = VIEW_CLASSES.some((c) => cls.contains(c));
+  const navOfKey = { feed: 'events', coupons: 'tracker', stats: 'stats', fav: 'fav', events: 'events' };
+  document.querySelectorAll('.side-nav .nav-item').forEach((b) => {
+    b.classList.toggle('active', anyView && navOfKey[lastViewKey] === b.dataset.nav);
+  });
+  if (bottomNav) {
+    const bnKey = lastViewKey === 'feed' || lastViewKey === 'fav' ? 'events'
+      : lastViewKey === 'coupons' ? 'tracker'
+      : lastViewKey === 'stats' ? 'stats' : 'chat';
+    bottomNav.querySelectorAll('button').forEach((x) => {
+      const k = x.dataset.nav;
+      x.classList.toggle('active', k === bnKey || (k === 'stats' && bnKey === 'stats'));
+    });
+  }
+}
+
+function showView(key, open) {
+  // повторный клик по уже открытому разделу — сворачиваем в чат
+  console.error('[nav] show', key, '| last=', lastViewKey, '| has=', document.body.classList.contains(VIEW_CLASS_OF[key]));
+  if (lastViewKey === key && document.body.classList.contains(VIEW_CLASS_OF[key])) {
+    closeAllViews();
+    lastViewKey = 'chat';
+    syncNav();
+    return;
+  }
+  closeAllViews();
+  open();
+  lastViewKey = key;
+  document.body.classList.remove('side-open');
+  syncNav();
+}
+
+const VIEW_CLASS_OF = { feed: 'feed-open', events: 'events-open', coupons: 'coupons-open', stats: 'stats-open' };
 
 document.querySelectorAll('.side-nav .nav-item').forEach((b) => {
   b.addEventListener('click', () => {
     const nav = b.dataset.nav;
-    if (nav === 'events') showView(() => feed.open());
-    if (nav === 'tracker') showView(() => coupons.open());
-    if (nav === 'stats') showView(() => stats.open());
+    if (nav === 'events') showView('feed', () => feed.open());
+    if (nav === 'tracker') showView('coupons', () => coupons.open());
+    if (nav === 'stats') showView('stats', () => stats.open());
     if (nav === 'fav') {
       // избранное живёт на странице матчей — включаем фильтр «только избранное»
       localStorage.setItem('sc_favOnly', '1');
-      showView(() => eventsView.open());
+      showView('fav', () => eventsView.open());
     }
   });
 });
@@ -209,19 +245,12 @@ if (bottomNav) {
   bottomNav.querySelectorAll('button').forEach((b) => {
     b.addEventListener('click', () => {
       const nav = b.dataset.nav;
-      if (nav === 'chat') { feed.close(); eventsView.close(); stats.close(); coupons.close(); }
-      if (nav === 'events') showView(() => feed.open());
-      if (nav === 'tracker') showView(() => coupons.open());
+      if (nav === 'chat') { closeAllViews(); lastViewKey = 'chat'; syncNav(); }
+      if (nav === 'events') showView('feed', () => feed.open());
+      if (nav === 'tracker') showView('coupons', () => coupons.open());
       if (nav === 'profile') profile.open();
     });
   });
-  // активная вкладка: чат / события / лента
-  new MutationObserver(() => {
-    const cls = document.body.classList;
-    const active = cls.contains('feed-open') || cls.contains('events-open') ? 'events' : 'chat';
-    bottomNav.querySelectorAll('button').forEach((x) =>
-      x.classList.toggle('active', x.dataset.nav === active));
-  }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
 }
 
 // service worker: офлайн-оболочка PWA
@@ -234,6 +263,9 @@ $('#livePanel .lp-close')?.addEventListener('click', () => {
   document.body.classList.remove('live-open');
   $('#livePanel').hidden = true;
 });
+
+// подсветка активного раздела синхронна с любым изменением вьюх
+new MutationObserver(syncNav).observe(document.body, { attributes: true, attributeFilter: ['class'] });
 
 // подсказка установки на iPhone (Safari, не standalone)
 (function pwaHint() {

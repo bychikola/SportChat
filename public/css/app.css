@@ -316,6 +316,11 @@ body.rail-hidden .rail { overflow: hidden; border-left: none; }
 }
 .nav-item:hover { background: var(--pitch-2); color: var(--chalk); }
 .nav-item:hover svg { color: var(--flut); }
+.side-nav .nav-item.active {
+  background: var(--pitch-2); color: var(--chalk);
+  box-shadow: inset 3px 0 0 var(--flut);
+}
+.side-nav .nav-item.active svg { color: var(--flut); }
 .nav-item:disabled { opacity: .55; cursor: default; }
 .nav-item:disabled:hover { background: none; color: var(--dim); }
 .nav-item svg { width: 17px; height: 17px; color: var(--faint); flex: none; transition: color .14s ease; }
