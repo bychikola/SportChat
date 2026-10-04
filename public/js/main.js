@@ -139,17 +139,24 @@ const coupons = createCoupons();
 const profile = createProfile();
 
 /* ══════════ Сайдбар: разделы (концепт-редизайн) + бейджи ══════════ */
+// вьюхи взаимоисключающие: открытие одной закрывает остальные
+const VIEW_CLASSES = ['feed-open', 'events-open', 'coupons-open', 'stats-open'];
+function showView(open) {
+  VIEW_CLASSES.forEach((c) => document.body.classList.remove(c));
+  open();
+  document.body.classList.remove('side-open');
+}
+
 document.querySelectorAll('.side-nav .nav-item').forEach((b) => {
   b.addEventListener('click', () => {
     const nav = b.dataset.nav;
-    if (nav === 'events') { feed.open(); document.body.classList.remove('side-open'); }
-    if (nav === 'tracker') { coupons.open(); document.body.classList.remove('side-open'); }
-    if (nav === 'stats') { stats.open(); document.body.classList.remove('side-open'); }
+    if (nav === 'events') showView(() => feed.open());
+    if (nav === 'tracker') showView(() => coupons.open());
+    if (nav === 'stats') showView(() => stats.open());
     if (nav === 'fav') {
       // избранное живёт на странице матчей — включаем фильтр «только избранное»
       localStorage.setItem('sc_favOnly', '1');
-      eventsView.open();
-      document.body.classList.remove('side-open');
+      showView(() => eventsView.open());
     }
   });
 });
@@ -202,9 +209,9 @@ if (bottomNav) {
   bottomNav.querySelectorAll('button').forEach((b) => {
     b.addEventListener('click', () => {
       const nav = b.dataset.nav;
-      if (nav === 'chat') { feed.close(); eventsView.close(); stats.close(); }
-      if (nav === 'events') feed.open();
-      if (nav === 'tracker') coupons.open();
+      if (nav === 'chat') { feed.close(); eventsView.close(); stats.close(); coupons.close(); }
+      if (nav === 'events') showView(() => feed.open());
+      if (nav === 'tracker') showView(() => coupons.open());
       if (nav === 'profile') profile.open();
     });
   });
