@@ -2,7 +2,7 @@
  * карточка экспресса дня с решением пользователя. Данные — /api/feed (Фаза 3). */
 import { $, esc, toast, rejectReasons } from './util.js';
 import { api } from './api.js';
-import { lpShowMatch } from './livepanel.js';
+import { lpShowMatch, lpShowLive } from './livepanel.js';
 
 const DAY_LABELS = ['ВС', 'ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ'];
 
@@ -22,11 +22,35 @@ export function createFeed() {
 
   const isOpen = () => document.body.classList.contains('feed-open');
 
+  /* L2-фронт: блок «🔴 Live сейчас» — клик открывает live-модель в правой панели */
+  async function loadLiveBlock() {
+    const box = $('#feedLive');
+    if (!box) return;
+    try {
+      const j = await api('/match/now/list');
+      const games = (j.games || []).slice(0, 6);
+      box.innerHTML = games.length ? games.map((g) => `
+        <button class="feed-live-row notch" data-id="${g.id}">
+          <span class="fl-min">${g.minute}'</span>
+          <span class="fl-score live">${esc(g.score)}</span>
+          <span class="fl-teams">${esc(g.home)} — ${esc(g.away)}<small>${esc(g.league)}</small></span>
+          <svg><use href="#i-chev"/></svg>
+        </button>`).join('') : '';
+      box.querySelectorAll('.feed-live-row').forEach((el) => {
+        el.addEventListener('click', () => {
+          const g = games.find((x) => String(x.id) === el.dataset.id);
+          if (g) lpShowLive(g.id, { home: g.home, away: g.away, league: g.league, stage: g.stage, score: g.score, minute: g.minute });
+        });
+      });
+    } catch { /* live-блок не критичен */ }
+  }
+
   function open() {
     view.hidden = false;
     document.body.classList.add('feed-open');
     document.body.classList.remove('events-open', 'side-open');
     if (!data) load();
+    loadLiveBlock();
   }
   function close() {
     document.body.classList.remove('feed-open');

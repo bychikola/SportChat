@@ -88,6 +88,7 @@ export function createCoupons() {
           ${payout ? `<span class="cp-payout ok">Выплата <b>${payout}</b></span>` : ''}
           ${lostNote ? `<span class="cp-payout err">${lostNote}</span>` : ''}
           <span class="cp-date">${esc((c.createdAt || '').slice(0, 10))}</span>
+          ${c.status === 'lost' ? `<button class="btn-secondary notch-sm cp-review" data-id="${esc(c.id)}" title="AI объяснит, почему модель ошиблась">🧠 Разбор ошибки</button>` : ''}
         </div>
       </div>`;
   }
@@ -119,6 +120,26 @@ export function createCoupons() {
     $('#couponsList').innerHTML = list.length
       ? list.map(couponCard).join('')
       : '<div class="empty-note">Купонов пока нет. Принимай прогнозы в чате или ленте — они появятся здесь и будут отслеживаться в реальном времени.</div>';
+    // L5: разбор ошибки — автозапрос в чат с фактами купона
+    document.querySelectorAll('.cp-review').forEach((b) => {
+      b.addEventListener('click', () => {
+        const coupon = list.find((x) => x.id === b.dataset.id);
+        if (!coupon) return;
+        const legsTxt = coupon.legs.map((l) =>
+          `• ${l.match} — ${l.market} @ ${l.odds} — ${l.status === 'won' ? 'зашло' : 'не зашло'}${l.score ? ` (финал ${l.score})` : ''}`).join('\n');
+        const q = `🧠 Разбор ошибки модели: купон ${coupon.id} (кэф ${coupon.odds}x) не зашёл.
+Ноги:
+${legsTxt}
+
+Объясни по-честному: главная причина переоценки модели (какой фактор был учтён неверно), масштаб ошибки в процентах, и чему модель должна научиться на этом матче.`;
+        const input = document.getElementById('input');
+        input.value = q;
+        input.dispatchEvent(new Event('input'));
+        document.body.classList.remove('coupons-open');
+        input.focus();
+        toast('Запрос на разбор отправлен в чат', 'ok', 3000);
+      });
+    });
   }
 
   async function load(silent = false) {

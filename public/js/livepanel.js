@@ -2,6 +2,7 @@
  * источники данных → действия агента с таймингами → сводка стрима → уверенность.
  * Наполняется из chat.js (tool-события, стрим, финал). */
 import { $, esc } from './util.js';
+import { api } from './api.js';
 
 let active = false;
 let startedAt = 0;
@@ -92,6 +93,7 @@ export function lpBegin(query = '') {
   seenSources = new Set();
   toolRows.clear();
   lpResetToRun();
+  stopLiveTimer();
   $('#lpSourceList').innerHTML = '<div class="lp-empty">Собираю источники…</div>';
   $('#lpActionList').innerHTML = '<div class="lp-empty">Жду первые действия…</div>';
   $('#lpSummary').textContent = 'Думаю…';
@@ -233,6 +235,98 @@ export function lpShowMatch(m, onAnalyze) {
   btn.hidden = false;
   btn.textContent = 'Разобрать в чате';
   btn.onclick = () => { if (onAnalyze) onAnalyze(m); };
+}
+
+/* ── Live Prediction Engine (PLAN-LIVE L2): drawer с моделью момента ── */
+let liveTimer = null;
+function stopLiveTimer() { if (liveTimer) { clearInterval(liveTimer); liveTimer = null; } }
+
+function liveChart(hist) {
+  if (!hist || hist.length < 2) return '<div class="lp-empty">График появится после второго снапшота модели (15–20 секунд).</div>';
+  const W = 300, H = 92;
+  const keys = [['p1', 'П1', 'var(--flut)'], ['p2', 'П2', 'var(--sky)'], ['tb25', 'ТБ 2.5', 'var(--go)']];
+  const all = hist.flatMap((h) => [h.p1, h.p2, h.tb25]);
+  const min = Math.min(...all) - 0.02, max = Math.max(...all) + 0.02;
+  const x = (i) => i * (W / Math.max(1, hist.length - 1));
+  const y = (v) => H - 8 - ((v - min) / (max - min || 1)) * (H - 18);
+  const lines = keys.map(([k, , color]) => {
+    const pts = hist.map((h, i) => `${x(i).toFixed(1)},${y(h[k]).toFixed(1)}`).join(' ');
+    const dots = hist.length <= 14 ? hist.map((h, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(h[k]).toFixed(1)}" r="2.2" fill="${color}"/>`).join('') : '';
+    return `<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"/>${dots}`;
+  }).join('');
+  const legend = keys.map(([k, label, color]) => `<span><i style="background:${color}"></i>${label}</span>`).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" class="lp-chart" preserveAspectRatio="none">${lines}</svg><div class="lp-legend">${legend}</div>`;
+}
+
+export function lpShowLive(id, pre) {
+  const panel = $('#livePanel');
+  if (!panel) return;
+  document.body.classList.add('live-open');
+  panel.hidden = false;
+  active = false;
+  seenSources = new Set();
+  toolRows.clear();
+  lpResetToRun();
+  stopLiveTimer();
+
+  const st = panel.querySelector('.lp-head .st');
+  if (st) { st.className = 'st st-run cp-live-pulse'; st.textContent = 'LIVE'; }
+  const match = $('#lpMatch');
+  match.hidden = false;
+  match.innerHTML = pre
+    ? `<span class="lp-q">${esc(pre.home)} — ${esc(pre.away)}</span><small>${esc(pre.league)} · ${esc(pre.stage)} · ${esc(pre.score)} · ${pre.minute}'</small>`
+    : 'Загружаю матч…';
+  $('#lpSources').style.display = 'none';
+  $('#lpActions').style.display = 'none';
+  $('#lpSummary').innerHTML = '<div class="lp-empty">Считаю модель момента: счёт, остаток времени, интенсивность…</div>';
+  setConf(null);
+
+  const btn = $('#lpAnalyzeBtn') || (() => {
+    const b = document.createElement('button');
+    b.id = 'lpAnalyzeBtn';
+    b.className = 'btn-primary notch-sm lp-analyze';
+    panel.appendChild(b);
+    return b;
+  })();
+  btn.hidden = false;
+  btn.textContent = 'Разобрать матч в чате';
+  btn.onclick = () => {
+    const input = document.getElementById('input');
+    input.value = `Живой разбор матча: ${pre ? `${pre.home} — ${pre.away}` : 'id ' + id} (идёт ${pre ? pre.minute : '?'}-я минута, счёт ${pre ? pre.score : '?'}). Проанализируй статистику момента и дай вердикт по исходам и тоталу.`;
+    input.dispatchEvent(new Event('input'));
+    document.body.classList.remove('live-open');
+    panel.hidden = true;
+    stopLiveTimer();
+    input.focus();
+  };
+
+  const load = async () => {
+    try {
+      const d = await api(`/match/${id}/live`);
+      if (d.match) {
+        match.innerHTML = `<span class="lp-q">${esc(d.match.home)} — ${esc(d.match.away)}</span><small>${esc(d.match.league)} · ${esc(d.match.stage)} · счёт ${esc(d.match.score)} · ${d.match.minute}' · начало ${esc(d.match.start || '—')}</small>`;
+      }
+      const valueRows = (d.value || []).map((v) =>
+        `<tr><td>${esc(v.name)}</td><td class="sig-odds">${v.odds}</td><td class="${v.value > 0 ? 'ok' : 'err'}">${v.value > 0 ? '+' : ''}${v.value}%</td></tr>`).join('');
+      const scen = (d.scenarios || []).map((s) => `<div class="lp-scen">${esc(s)}</div>`).join('');
+      $('#lpSummary').innerHTML = `
+        ${liveChart(d.history)}
+        <table class="sig-table">
+          <tr><th>П1 сейчас</th><td class="sig-odds">${d.model.p1}%</td></tr>
+          <tr><th>Ничья</th><td class="sig-odds">${d.model.px}%</td></tr>
+          <tr><th>П2 сейчас</th><td class="sig-odds">${d.model.p2}%</td></tr>
+          <tr><th>Тотал больше 2.5</th><td class="sig-odds">${d.model.tb25}%</td></tr>
+        </table>
+        ${d.pressure ? `<div class="lp-note">Удары: ${esc(d.pressure.shots)}</div>` : ''}
+        ${valueRows ? `<table class="sig-table"><thead><tr><th>Live-value (Pari/линия)</th><th>Кэф</th><th>Value</th></tr></thead><tbody>${valueRows}</tbody></table>` : ''}
+        ${scen}`;
+      setConf(d.confidence, 'уверенность модели');
+    } catch (e) {
+      $('#lpSummary').innerHTML = `<div class="lp-empty">Live-модель недоступна: ${esc(String(e?.message || e).slice(0, 120))}</div>`;
+    }
+  };
+  load();
+  liveTimer = setInterval(load, 15_000); // график растёт по минутам
 }
 
 /** Вернуть панель в режим хода (сброс матч-режима). */

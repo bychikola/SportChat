@@ -619,6 +619,44 @@ body.coupons-open .composer-wrap { display: none; }
 }
 .cp-amount input::placeholder { color: var(--faint); }
 .cp-amount:focus-within { border-color: rgba(255, 180, 84, .5); }
+.cp-review { margin-left: auto; padding: 6px 12px; }
+
+/* ── L2: live-блок ленты + live-режим drawer ── */
+.feed-live { display: flex; gap: 7px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.feed-live:empty { display: none; }
+.feed-live::-webkit-scrollbar { display: none; }
+.feed-live-row {
+  flex: 0 0 224px; display: flex; align-items: center; gap: 9px;
+  padding: 8px 11px; background: var(--pitch-1); color: var(--chalk); text-align: left;
+  box-shadow: inset 0 0 0 1px rgba(127, 181, 255, .35);
+  transition: transform .1s ease;
+}
+.feed-live-row:active { transform: scale(.97); }
+.fl-min {
+  flex: none; font-family: var(--f-mono); font-size: 11px; font-weight: 700;
+  color: var(--sky); min-width: 30px; text-align: center;
+}
+.fl-score { flex: none; font-family: var(--f-mono); font-weight: 700; font-size: 13px; color: var(--chalk); }
+.fl-score.live { color: var(--go); }
+.fl-teams { flex: 1; min-width: 0; font-size: 11.5px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fl-teams small { display: block; color: var(--faint); font-size: 9.5px; }
+.feed-live-row svg { width: 13px; height: 13px; color: var(--faint); flex: none; }
+.lp-chart { width: 100%; height: 92px; display: block; margin-bottom: 6px; }
+.lp-legend { display: flex; gap: 12px; font-size: 10px; color: var(--faint); margin-bottom: 10px; }
+.lp-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
+.lp-scen {
+  padding: 8px 10px; margin-bottom: 7px; border-radius: 9px;
+  background: var(--go-dim); color: var(--chalk); font-size: 12px; line-height: 1.45;
+}
+.lp-note { margin-top: 8px; font-size: 11px; color: var(--faint); }
+.track-table td.ok { color: var(--go); font-family: var(--f-mono); }
+.track-table td.err { color: var(--danger); font-family: var(--f-mono); }
+.bankroll-block { margin-top: 12px; }
+.bankroll-cap { font-size: 10.5px; color: var(--dim); margin-bottom: 6px; }
+.bankroll-svg { width: 100%; height: 110px; display: block; }
+.bankroll-val { text-align: right; font-family: var(--f-mono); font-size: 14px; font-weight: 700; margin-top: 4px; }
+.bankroll-val.ok { color: var(--go); }
+.bankroll-val.err { color: var(--danger); }
 .btn-new {
   display: flex; align-items: center; justify-content: center; gap: 9px;
   flex: 1 1 auto; min-width: 0; padding: 11px 12px;

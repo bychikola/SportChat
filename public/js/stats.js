@@ -112,7 +112,12 @@ export function createStats() {
     let stats = null;
     let decisions = [];
     let predictions = null;
-    try { stats = (await api('/signals')).stats; } catch { /* без трекера */ }
+    let signalsList = [];
+    try {
+      const sigs = await api('/signals');
+      stats = sigs.stats;
+      signalsList = sigs.signals || [];
+    } catch { /* без трекера */ }
     try { predictions = (await api('/predictions')).predictions; } catch { /* без моих прогнозов */ }
     try { decisions = JSON.parse(localStorage.getItem('sc_signalDecisions') || '[]'); } catch { /* приватный режим */ }
     if (!stats) {
@@ -121,6 +126,10 @@ export function createStats() {
     }
     $('#statsHero').innerHTML = hero(stats, decisions);
     body.innerHTML = `
+      <div class="stats-sec notch">
+        <div class="stats-cap">📊 AI Track Record — история ведётся сервером, без правок задним числом</div>
+        ${trackRecord(predictions, signalsList)}
+      </div>
       <div class="stats-sec notch">
         <div class="stats-cap">Мои прогнозы</div>
         ${myPredictions(predictions)}
@@ -134,6 +143,65 @@ export function createStats() {
         ${decisionBars(decisions)}
       </div>`;
     loaded = true;
+  }
+
+  /* ── L4: Track Record — Win Rate / ROI по рынкам + банкролл ── */
+  function trackRecord(preds, sigs) {
+    const rows = new Map(); // рынок → {n, won, pnl (flat 1 ед)}
+    const add = (market, status, odds) => {
+      if (status !== 'won' && status !== 'lost') return;
+      const r = rows.get(market) || { n: 0, won: 0, pnl: 0 };
+      r.n++;
+      if (status === 'won') { r.won++; r.pnl += (Number(odds) || 1) - 1; }
+      else r.pnl -= 1;
+      rows.set(market, r);
+    };
+    for (const p of preds || []) for (const l of p.legs || []) add(l.market || 'прочее', l.status, l.odds);
+    for (const s of sigs || []) add(s.market || 'прочее', s.status, s.odds);
+    if (!rows.size) return '<div class="empty-note">Рассчитанных прогнозов пока нет — таблица появится после первых матчей.</div>';
+    const table = [...rows.entries()].sort((a, b) => b[1].n - a[1].n).map(([m, r]) => {
+      const wr = Math.round(r.won / r.n * 100);
+      const roi = Math.round(r.pnl / r.n * 100);
+      return `<tr><td>${esc(m)}</td><td>${r.n}</td><td>${wr}%</td><td class="${roi >= 0 ? 'ok' : 'err'}">${roi >= 0 ? '+' : ''}${roi}%</td></tr>`;
+    }).join('');
+    return `
+      <table class="sig-table track-table">
+        <thead><tr><th>Рынок</th><th>Прогнозов</th><th>Win Rate</th><th>ROI</th></tr></thead>
+        <tbody>${table}</tbody>
+      </table>
+      <div class="bankroll-block">
+        <div class="bankroll-cap">Кривая банкролла (по купонам с суммой)</div>
+        ${bankrollLine(preds)}
+      </div>`;
+  }
+
+  function bankrollLine(preds) {
+    const pts = (preds || [])
+      .filter((p) => p.amount && p.status !== 'pending' && p.status !== 'live')
+      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    if (pts.length < 2) return '<div class="empty-note">Для кривой банкролла нужно минимум 2 рассчитанных купона с указанной суммой.</div>';
+    let bank = 0;
+    const xs = [0], ys = [0];
+    for (const p of pts) {
+      bank -= p.amount;
+      if (p.status === 'won') bank += p.amount * p.odds;
+      if (p.status === 'void') bank += p.amount;
+      xs.push(xs.length);
+      ys.push(Math.round(bank));
+    }
+    const min = Math.min(0, ...ys), max = Math.max(1, ...ys);
+    const W = 560, H = 110, pad = 4;
+    const px = (i) => pad + i * ((W - pad * 2) / (ys.length - 1));
+    const py = (v) => H - pad - ((v - min) / (max - min || 1)) * (H - pad * 2);
+    const poly = ys.map((v, i) => `${px(i)},${py(v).toFixed(1)}`).join(' ');
+    const last = ys[ys.length - 1];
+    const zeroY = py(0).toFixed(1);
+    return `
+      <svg viewBox="0 0 ${W} ${H}" class="bankroll-svg" preserveAspectRatio="none">
+        <line x1="${pad}" y1="${zeroY}" x2="${W - pad}" y2="${zeroY}" stroke="rgba(237,243,234,.15)" stroke-dasharray="4 4"/>
+        <polyline points="${poly}" fill="none" stroke="var(--go)" stroke-width="2.5" stroke-linejoin="round" ${last < 0 ? 'style="stroke:var(--danger)"' : ''}/>
+      </svg>
+      <div class="bankroll-val ${last >= 0 ? 'ok' : 'err'}">${last >= 0 ? '+' : ''}${last.toLocaleString('ru-RU')} ₽</div>`;
   }
 
   const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);

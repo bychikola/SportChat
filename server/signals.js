@@ -42,6 +42,9 @@ export function outcomeFor(key, g) {
   if (k === '1') return h > a ? 'won' : 'lost';
   if (k === '2') return a > h ? 'won' : 'lost';
   if (k === 'x') return h === a ? 'won' : 'lost';
+  if (k === '1x') return h >= a ? 'won' : 'lost';
+  if (k === '12') return h !== a ? 'won' : 'lost';
+  if (k === 'x2') return a >= h ? 'won' : 'lost';
   if (k === 'btts_yes') return (h > 0 && a > 0) ? 'won' : 'lost';
   if (k === 'btts_no') return (h === 0 || a === 0) ? 'won' : 'lost';
   if (mTot) {

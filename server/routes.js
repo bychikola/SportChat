@@ -16,6 +16,7 @@ import signalsRouter from './signals.js';
 import authRouter from './auth.js';
 import feedRouter from './feed.js';
 import predictionsRouter from './predictions.js';
+import matchRouter from './match.js';
 
 const router = express.Router();
 
@@ -24,6 +25,7 @@ router.use('/signals', signalsRouter);
 router.use('/auth', authRouter);
 router.use('/feed', feedRouter);
 router.use('/predictions', predictionsRouter);
+router.use('/match', matchRouter);
 
 /* ---------- meta & sessions ---------- */
 

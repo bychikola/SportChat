@@ -62,7 +62,7 @@ let last = 0;
 const pois = (k, l) => { let p = Math.exp(-l); for (let i = 1; i <= k; i++) p *= l / i; return p; };
 
 function marketProbs(lh, la) {
-  let p1 = 0, px = 0, p2 = 0, under = 0, total = 0;
+  let p1 = 0, px = 0, p2 = 0, under = 0, both = 0, total = 0;
   for (let h = 0; h <= 9; h++) {
     for (let a = 0; a <= 9; a++) {
       const p = pois(h, lh) * pois(a, la);
@@ -71,33 +71,50 @@ function marketProbs(lh, la) {
       else if (h === a) px += p;
       else p2 += p;
       if (h + a <= 2) under += p;
+      if (h > 0 && a > 0) both += p;
     }
   }
   const s = total || 1;
-  return { p1: p1 / s, px: px / s, p2: p2 / s, tb25: 1 - under / s, tm25: under / s };
+  return { p1: p1 / s, px: px / s, p2: p2 / s, tb25: 1 - under / s, tm25: under / s, bttsYes: both / s, bttsNo: 1 - both / s };
 }
 
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
 
-/** Форма команды → λ голов (встречные средние пропущенные). */
+/** Форма команды → λ голов: xG смешивается с фактическими голами (L1: xG-модель). */
 function expectedGoals(homeStats, awayStats) {
-  const lh = clamp((homeStats.avgScore + awayStats.avgConceded) / 2, 0.2, 4.2);
-  const la = clamp((awayStats.avgScore + homeStats.avgConceded) / 2, 0.2, 4.2);
-  return { lh, la };
+  const mix = (ownXg, ownGoals, rivalConceded) =>
+    ((ownXg ?? ownGoals) + ownGoals + rivalConceded) / 3;
+  const lh = clamp(mix(homeStats.avgOddsXg, homeStats.avgScore, awayStats.avgConceded), 0.2, 4.2);
+  const la = clamp(mix(awayStats.avgOddsXg, awayStats.avgScore, homeStats.avgConceded), 0.2, 4.2);
+  const xg = Number.isFinite(homeStats.avgOddsXg) && Number.isFinite(awayStats.avgOddsXg);
+  return { lh, la, xg };
 }
 
-/** Кэфы 1X2 и ТБ 2.5 из сокращённых данных Games/list. */
+/** Кэфы 1X2, DC, ТБ/ТМ 2.5, ОЗ из сокращённых данных Games/list (L1). */
 function extractOdds(game) {
-  const out = { h: null, x: null, a: null, over25: null, under25: null };
+  const out = {
+    h: null, x: null, a: null, over25: null, under25: null,
+    dc1x: null, dc12: null, dcx2: null, bttsYes: null, bttsNo: null,
+  };
   for (const m of Array.isArray(game.odds) ? game.odds : []) {
-    if (m.marketId === 1) for (const o of m.odds || []) {
-      if (o.name === 'Home') out.h = o.value;
-      if (o.name === 'Draw') out.x = o.value;
-      if (o.name === 'Away') out.a = o.value;
-    }
-    if (m.marketId === 5) for (const o of m.odds || []) {
-      if (/over/i.test(o.name || '')) out.over25 = o.value;
-      if (/under/i.test(o.name || '')) out.under25 = o.value;
+    for (const o of m.odds || []) {
+      const n = o.name || '';
+      const v = o.value;
+      if (m.marketId === 1) {
+        if (n === 'Home') out.h = v;
+        if (n === 'Draw') out.x = v;
+        if (n === 'Away') out.a = v;
+      } else if (m.marketId === 12) {
+        if (n === 'Home/Draw') out.dc1x = v;
+        if (n === 'Home/Away') out.dc12 = v;
+        if (n === 'Draw/Away') out.dcx2 = v;
+      } else if (m.marketId === 5) {
+        if (/over/i.test(n)) out.over25 = v;
+        if (/under/i.test(n)) out.under25 = v;
+      } else if (m.marketId === 8) {
+        if (/yes/i.test(n)) out.bttsYes = v;
+        if (/no/i.test(n)) out.bttsNo = v;
+      }
     }
   }
   return out;
@@ -153,23 +170,28 @@ async function buildFeed(date, apiKey) {
   }
   await Promise.all([worker(), worker(), worker(), worker()]);
 
-  // 4. Poisson → рынки → value → confidence
+  // 4. Poisson → рынки → value → confidence (L1: честный confidence от полноты данных)
   const matches = [];
   const legsPool = [];
   for (const { g, odds, stats } of enriched) {
     if (!stats?.home || !stats?.away) continue;
-    const { lh, la } = expectedGoals(stats.home, stats.away);
+    const { lh, la, xg } = expectedGoals(stats.home, stats.away);
     const p = marketProbs(lh, la);
     const start = new Date(g.date);
     const time = start.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow' });
     const dayLabel = start.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', timeZone: 'Europe/Moscow' });
 
+    // L1: confidence = полнота данных (форма/xG/линия) + запас на value; без иллюзии точности
+    const hasForm = Number.isFinite(stats.home.avgScore) && Number.isFinite(stats.away.avgScore);
+    const hasOdds = !!(odds.h && odds.a);
+    const conf = Math.round(clamp(
+      40 + (hasForm ? 20 : 0) + (xg ? 15 : 0) + (hasOdds ? 10 : 0),
+      40, 92,
+    ));
+
     const mk = (key, nameRu, prob, odd) => {
       if (!odd || !Number.isFinite(prob)) return null;
       const value = prob * odd - 1;
-      const conf = Math.round(clamp(
-        50 + Math.min(10, 10) * 1.2 + clamp(value * 100, 0, 15) * 1.3, 40, 88,
-      ));
       return { market: key, name: nameRu, p: prob, odds: odd, fair: +(1 / prob).toFixed(2), value, conf };
     };
     const variants = [
@@ -178,7 +200,12 @@ async function buildFeed(date, apiKey) {
       mk('2', 'Исход 2', p.p2, odds.a),
       mk('tb25', 'Тотал больше 2.5', p.tb25, odds.over25),
       mk('tm25', 'Тотал меньше 2.5', p.tm25, odds.under25),
-    ].filter(Boolean).filter((v) => v.odds >= 1.2 && v.p >= 0.18);
+      mk('btts_yes', 'Обе забьют — да', p.bttsYes, odds.bttsYes),
+      mk('btts_no', 'Обе забьют — нет', p.bttsNo, odds.bttsNo),
+      mk('1x', 'Двойной шанс 1X', p.p1 + p.px, odds.dc1x),
+      mk('12', 'Двойной шанс 12', p.p1 + p.p2, odds.dc12),
+      mk('x2', 'Двойной шанс X2', p.px + p.p2, odds.dcx2),
+    ].filter(Boolean).filter((v) => v.odds >= 1.15 && v.p >= 0.18);
 
     if (!variants.length) continue;
     variants.sort((a, b) => b.value - a.value);
